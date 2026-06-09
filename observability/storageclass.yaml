@@ -1,9 +1,9 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: ebs-aws
-  annotations:
-    storageclass.kubernetes.io/is-default-class: "true"
-provisioner: ebs.csi.aws.com
+  name: azure-disk
+provisioner: disk.csi.azure.com
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
+parameters:
+  skuName: Premium_LRS
