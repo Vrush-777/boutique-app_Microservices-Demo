@@ -45,6 +45,7 @@ jobs:
             SERVICES=$(find src/ -name Dockerfile \
               | sed 's|src/\([^/]*\)/.*|\1|' \
               | sort -u \
+              | grep -v shoppingassistantservice \
               | jq -R -s -c 'split("\n")[:-1]')
           else
             echo "src_changed=false" >> $GITHUB_OUTPUT
@@ -190,3 +191,6 @@ jobs:
 
       - name: Apply Ingress
         run: kubectl apply -f microservices-extra-kube-manifests/ingress-aks.yaml
+
+      - name: Apply frontend HPA
+        run: kubectl apply -f scaling/frontend-hpa.yaml -n ${{ env.NAMESPACE }}
