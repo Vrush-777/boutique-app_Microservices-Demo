@@ -5,65 +5,130 @@ on:
     branches: [ main ]
     paths:
       - "src/**"
+      - "helm-chart/**"
+      - "microservices-extra-kube-manifests/**"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  NAMESPACE: boutique-app
+  RELEASE_NAME: onlineboutique
+  RESOURCE_GROUP: AZET-RG-Daas-Platform
+  CLUSTER_NAME: ppowar-aks
+
 jobs:
   # -----------------------------------------------
-  # CI - Job 1: Discover all services with a Dockerfile
+  # Job 1 — Detect what changed and list services
   # -----------------------------------------------
-  detect-services:
+  detect:
     runs-on: ubuntu-latest
     outputs:
-      services: ${{ steps.list.outputs.services }}
+      services:   ${{ steps.detect.outputs.services }}
+      src_changed: ${{ steps.detect.outputs.src_changed }}
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: List all services
-        id: list
+      - name: Detect changes and list services
+        id: detect
         run: |
-          SERVICES=$(find src/ -name Dockerfile \
-            | sed 's|src/\([^/]*\)/.*|\1|' \
-            | sort -u \
-            | jq -R -s -c 'split("\n")[:-1]')
+          SRC_CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} \
+            | grep -c '^src/' || true)
+
+          if [ "$SRC_CHANGED" -gt "0" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "src_changed=true" >> $GITHUB_OUTPUT
+            SERVICES=$(find src/ -name Dockerfile \
+              | sed 's|src/\([^/]*\)/.*|\1|' \
+              | sort -u \
+              | jq -R -s -c 'split("\n")[:-1]')
+          else
+            echo "src_changed=false" >> $GITHUB_OUTPUT
+            SERVICES="[]"
+          fi
+
           echo "Discovered services: $SERVICES"
           echo "services=$SERVICES" >> $GITHUB_OUTPUT
 
   # -----------------------------------------------
-  # CI - Job 2: Build, scan and push to Docker Hub
+  # Job 2 — Build, scan and push all images (CI)
   # -----------------------------------------------
   build-and-push:
-    needs: detect-services
+    needs: detect
+    if: needs.detect.outputs.src_changed == 'true'
+    runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        service: ${{ fromJson(needs.detect-services.outputs.services) }}
+        service: ${{ fromJson(needs.detect.outputs.services) }}
 
-    uses: ./.github/workflows/microservice-ci.yaml
-    secrets: inherit
-
-    with:
-      service: ${{ matrix.service }}
-
-  # -----------------------------------------------
-  # CD - Job 3: Deploy all services to AKS via Helm
-  # -----------------------------------------------
-  deploy:
-    needs: [detect-services, build-and-push]
-    runs-on: ubuntu-latest
     env:
-      NAMESPACE: boutique-app
-      RELEASE_NAME: onlineboutique
-      RESOURCE_GROUP: AZET-RG-Daas-Platform
-      CLUSTER_NAME: ppowar-aks
+      IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/microservices-demo-${{ matrix.service }}:sha-${{ github.sha }}
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Resolve build context
+        id: ctx
+        run: |
+          if [ -f "./src/${{ matrix.service }}/Dockerfile" ]; then
+            echo "context=./src/${{ matrix.service }}" >> $GITHUB_OUTPUT
+            echo "dockerfile=./src/${{ matrix.service }}/Dockerfile" >> $GITHUB_OUTPUT
+          else
+            DOCKERFILE=$(find "./src/${{ matrix.service }}" -name Dockerfile | head -1)
+            echo "context=$(dirname $DOCKERFILE)" >> $GITHUB_OUTPUT
+            echo "dockerfile=$DOCKERFILE" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build image
+        run: |
+          docker build \
+            --cache-from=type=gha \
+            --cache-to=type=gha,mode=max \
+            -f ${{ steps.ctx.outputs.dockerfile }} \
+            -t ${{ env.IMAGE }} \
+            ${{ steps.ctx.outputs.context }}
+
+      - name: Trivy security scan
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE }}
+          severity: HIGH,CRITICAL
+          exit-code: 0
+          vuln-type: os,library
+
+      - name: Push image to Docker Hub
+        run: docker push ${{ env.IMAGE }}
+
+  # -----------------------------------------------
+  # Job 3 — Deploy to AKS via Helm (CD)
+  # -----------------------------------------------
+  deploy:
+    needs: [ detect, build-and-push ]
+    if: |
+      always() &&
+      needs.detect.result == 'success' &&
+      (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Azure Login
@@ -71,7 +136,7 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Get AKS Credentials
+      - name: Get AKS credentials
         run: |
           az aks get-credentials \
             --resource-group ${{ env.RESOURCE_GROUP }} \
@@ -82,7 +147,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
 
-      - name: Create namespace if not exists
+      - name: Create namespace
         run: |
           kubectl create namespace ${{ env.NAMESPACE }} \
             --dry-run=client -o yaml | kubectl apply -f -
@@ -96,21 +161,23 @@ jobs:
             --docker-password=${{ secrets.DOCKERHUB_TOKEN }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Resolve field manager conflicts
+      - name: Fix Helm field-manager conflict on frontend Service
         run: |
-          kubectl get svc,deploy -n ${{ env.NAMESPACE }} -o yaml 2>/dev/null \
-            | kubectl apply --server-side --force-conflicts \
-                --field-manager=helm -f - 2>/dev/null || true
+          kubectl delete service frontend \
+            --namespace ${{ env.NAMESPACE }} \
+            --ignore-not-found
 
-      - name: Deploy all services to AKS
+      - name: Deploy to AKS
         run: |
-          SERVICES='${{ needs.detect-services.outputs.services }}'
           SET_FLAGS=""
-          for svc in $(echo "$SERVICES" | jq -r '.[]'); do
-            SET_FLAGS="$SET_FLAGS \
-              --set images.${svc}.repository=${{ secrets.DOCKERHUB_USERNAME }}/microservices-demo-${svc} \
-              --set images.${svc}.tag=sha-${{ github.sha }}"
-          done
+          if [ "${{ needs.detect.outputs.src_changed }}" = "true" ]; then
+            SERVICES='${{ needs.detect.outputs.services }}'
+            for svc in $(echo "$SERVICES" | jq -r '.[]'); do
+              SET_FLAGS="$SET_FLAGS \
+                --set images.${svc}.repository=${{ secrets.DOCKERHUB_USERNAME }}/microservices-demo-${svc} \
+                --set images.${svc}.tag=sha-${{ github.sha }}"
+            done
+          fi
 
           helm upgrade --install ${{ env.RELEASE_NAME }} ./helm-chart \
             --namespace ${{ env.NAMESPACE }} \
