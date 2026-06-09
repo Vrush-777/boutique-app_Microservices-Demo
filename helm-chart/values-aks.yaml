@@ -1,5 +1,6 @@
 frontend:
   platform: azure
+  externalService: true
 
 imagePullSecrets:
   - name: dockerhub-pull-secret
