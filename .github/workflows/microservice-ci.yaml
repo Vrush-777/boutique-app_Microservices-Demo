@@ -26,13 +26,26 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Resolve build context and Dockerfile path
+        id: ctx
+        run: |
+          if [ -f "./src/${{ inputs.service }}/Dockerfile" ]; then
+            echo "context=./src/${{ inputs.service }}" >> $GITHUB_OUTPUT
+            echo "dockerfile=./src/${{ inputs.service }}/Dockerfile" >> $GITHUB_OUTPUT
+          else
+            DOCKERFILE=$(find "./src/${{ inputs.service }}" -name Dockerfile | head -1)
+            echo "context=$(dirname $DOCKERFILE)" >> $GITHUB_OUTPUT
+            echo "dockerfile=$DOCKERFILE" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build image
         run: |
           docker build \
             --cache-from=type=gha \
             --cache-to=type=gha,mode=max \
+            -f ${{ steps.ctx.outputs.dockerfile }} \
             -t ${{ env.IMAGE }} \
-            ./src/${{ inputs.service }}
+            ${{ steps.ctx.outputs.context }}
 
       - name: Run Trivy Scan
         uses: aquasecurity/trivy-action@v0.20.0
