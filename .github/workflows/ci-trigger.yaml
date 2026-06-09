@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   # -------------------------------
@@ -50,9 +49,64 @@ jobs:
       matrix:
         service: ${{ fromJson(needs.detect-changes.outputs.services) }}
 
-    # 🚨 IMPORTANT:
     # Reusable workflows are called at JOB level
     uses: ./.github/workflows/microservice-ci.yaml
+    secrets: inherit
 
     with:
       service: ${{ matrix.service }}
+
+
+  # -------------------------------------------------------
+  # Job 3: Deploy to AKS with newly built image tags
+  # -------------------------------------------------------
+  deploy:
+    needs: [detect-changes, build-and-push]
+    if: needs.detect-changes.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: boutique-app
+      RELEASE_NAME: onlineboutique
+      RESOURCE_GROUP: AZET-RG-Daas-Platform
+      CLUSTER_NAME: ppowar-aks
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get AKS Credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.CLUSTER_NAME }} \
+            --admin \
+            --overwrite-existing
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Deploy to AKS with updated image tags
+        run: |
+          SERVICES='${{ needs.detect-changes.outputs.services }}'
+          SET_FLAGS=""
+          for svc in $(echo "$SERVICES" | jq -r '.[]'); do
+            SET_FLAGS="$SET_FLAGS \
+              --set images.${svc}.repository=${{ secrets.DOCKERHUB_USERNAME }}/microservices-demo-${svc} \
+              --set images.${svc}.tag=sha-${{ github.sha }}"
+          done
+
+          helm upgrade --install ${{ env.RELEASE_NAME }} ./helm-chart \
+            --namespace ${{ env.NAMESPACE }} \
+            --values ./helm-chart/values.yaml \
+            --values ./helm-chart/values-aks.yaml \
+            $SET_FLAGS \
+            --wait \
+            --timeout 5m
+
+      - name: Apply Ingress
+        run: kubectl apply -f microservices-extra-kube-manifests/ingress-aks.yaml

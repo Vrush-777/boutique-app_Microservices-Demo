@@ -52,6 +52,8 @@ images:
     repository: ghcr.io/laxmikantagiri/microservices-demo/shippingservice
     tag: v0.10.4
 
+imagePullSecrets: []
+
 serviceAccounts:
   # Specifies whether service accounts should be created.
   create: true
