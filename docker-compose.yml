@@ -1,0 +1,263 @@
+version: "3.9"
+
+networks:
+  microservices-net:
+    driver: bridge
+
+services:
+
+  # ─────────────────────────────────────────────
+  # AD SERVICE (Java) :9555
+  # ─────────────────────────────────────────────
+  adservice:
+    build:
+      context: ./src/adservice
+      dockerfile: Dockerfile
+    image: adservice:latest
+    container_name: adservice
+    ports:
+      - "9555:9555"
+    environment:
+      - PORT=9555
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # REDIS (for Cart)
+  # ─────────────────────────────────────────────
+  redis-cart:
+    image: redis:7-alpine
+    container_name: redis-cart
+    networks:
+      - microservices-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # CART SERVICE (C#) :7070
+  # Dockerfile lives inside src/cartservice/src/
+  # ─────────────────────────────────────────────
+  cartservice:
+    build:
+      context: ./src/cartservice/src
+      dockerfile: Dockerfile
+    image: cartservice:latest
+    container_name: cartservice
+    ports:
+      - "7070:7070"
+    environment:
+      - PORT=7070
+      - REDIS_ADDR=redis-cart:6379
+    depends_on:
+      redis-cart:
+        condition: service_healthy
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # CURRENCY SERVICE (Node.js) :7000
+  # Uses Dockerfile.fix to avoid pprof/Alpine build failure
+  # ─────────────────────────────────────────────
+  currencyservice:
+    build:
+      context: ./src/currencyservice
+      dockerfile: Dockerfile.fix
+    image: currencyservice:latest
+    container_name: currencyservice
+    ports:
+      - "7000:7000"
+    environment:
+      - PORT=7000
+      - DISABLE_PROFILER=1
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # EMAIL SERVICE (Python) :8080
+  # ─────────────────────────────────────────────
+  emailservice:
+    build:
+      context: ./src/emailservice
+      dockerfile: Dockerfile
+    image: emailservice:latest
+    container_name: emailservice
+    environment:
+      - PORT=8080
+      - DISABLE_PROFILER=1
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # PRODUCT CATALOG SERVICE (Go) :3550
+  # ─────────────────────────────────────────────
+  productcatalogservice:
+    build:
+      context: ./src/productcatalogservice
+      dockerfile: Dockerfile
+    image: productcatalogservice:latest
+    container_name: productcatalogservice
+    ports:
+      - "3550:3550"
+    environment:
+      - PORT=3550
+      - DISABLE_PROFILER=1
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # PAYMENT SERVICE (Node.js) :50051
+  # ─────────────────────────────────────────────
+  paymentservice:
+    build:
+      context: ./src/paymentservice
+      dockerfile: Dockerfile
+    image: paymentservice:latest
+    container_name: paymentservice
+    environment:
+      - PORT=50051
+      - DISABLE_PROFILER=1
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # SHIPPING SERVICE (Go) :50051
+  # ─────────────────────────────────────────────
+  shippingservice:
+    build:
+      context: ./src/shippingservice
+      dockerfile: Dockerfile
+    image: shippingservice:latest
+    container_name: shippingservice
+    environment:
+      - PORT=50051
+      - DISABLE_PROFILER=1
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # RECOMMENDATION SERVICE (Python) :8080
+  # ─────────────────────────────────────────────
+  recommendationservice:
+    build:
+      context: ./src/recommendationservice
+      dockerfile: Dockerfile
+    image: recommendationservice:latest
+    container_name: recommendationservice
+    environment:
+      - PORT=8080
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - DISABLE_PROFILER=1
+    depends_on:
+      - productcatalogservice
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # CHECKOUT SERVICE (Go) :5050
+  # ─────────────────────────────────────────────
+  checkoutservice:
+    build:
+      context: ./src/checkoutservice
+      dockerfile: Dockerfile
+    image: checkoutservice:latest
+    container_name: checkoutservice
+    environment:
+      - PORT=5050
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051
+      - PAYMENT_SERVICE_ADDR=paymentservice:50051
+      - EMAIL_SERVICE_ADDR=emailservice:8080
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000
+      - CART_SERVICE_ADDR=cartservice:7070
+    depends_on:
+      - productcatalogservice
+      - shippingservice
+      - paymentservice
+      - emailservice
+      - currencyservice
+      - cartservice
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # SHOPPING ASSISTANT SERVICE :8080
+  # ─────────────────────────────────────────────
+  shoppingassistantservice:
+    build:
+      context: ./src/shoppingassistantservice
+      dockerfile: Dockerfile
+    image: shoppingassistantservice:latest
+    container_name: shoppingassistantservice
+    environment:
+      - PORT=8080
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # FRONTEND (Go) :8080  ← open this in browser
+  # ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+    image: frontend:latest
+    container_name: frontend
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000
+      - CART_SERVICE_ADDR=cartservice:7070
+      - RECOMMENDATION_SERVICE_ADDR=recommendationservice:8080
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051
+      - CHECKOUT_SERVICE_ADDR=checkoutservice:5050
+      - AD_SERVICE_ADDR=adservice:9555
+      - SHOPPING_ASSISTANT_SERVICE_ADDR=shoppingassistantservice:8080
+      - ENV_PLATFORM=local
+      - CYMBAL_BRANDING=false
+    depends_on:
+      - productcatalogservice
+      - currencyservice
+      - cartservice
+      - recommendationservice
+      - shippingservice
+      - checkoutservice
+      - adservice
+      - shoppingassistantservice
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # LOAD GENERATOR (Locust)
+  # ─────────────────────────────────────────────
+  loadgenerator:
+    build:
+      context: ./src/loadgenerator
+      dockerfile: Dockerfile
+    image: loadgenerator:latest
+    container_name: loadgenerator
+    environment:
+      - FRONTEND_ADDR=frontend:8080
+      - USERS=10
+    depends_on:
+      - frontend
+    networks:
+      - microservices-net
+    restart: unless-stopped
+

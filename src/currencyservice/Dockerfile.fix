@@ -1,0 +1,20 @@
+FROM node:18-alpine3.17
+
+WORKDIR /usr/src/app
+
+# Install build tools needed for native modules
+RUN apk add --no-cache python3 make g++
+
+COPY package*.json ./
+
+# Use legacy-peer-deps and skip pprof specifically
+RUN npm install --only=production --ignore-scripts \
+    && npm uninstall pprof || true
+
+COPY . .
+
+EXPOSE 7000
+ENV PORT=7000
+ENV DISABLE_PROFILER=1
+
+CMD ["node", "server.js"]
