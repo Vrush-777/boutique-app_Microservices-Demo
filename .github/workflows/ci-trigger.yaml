@@ -69,7 +69,8 @@ jobs:
         service: ${{ fromJson(needs.detect.outputs.services) }}
 
     env:
-      IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/boutique-app:${{ matrix.service }}
+      REPO: ${{ secrets.DOCKERHUB_USERNAME }}/boutique-app
+      SVC:  ${{ matrix.service }}
 
     steps:
       - name: Checkout
@@ -98,24 +99,29 @@ jobs:
 
       - name: Build image
         run: |
+          SHORT_SHA=${GITHUB_SHA::7}
           docker build \
             --cache-from=type=gha \
             --cache-to=type=gha,mode=max \
             -f ${{ steps.ctx.outputs.dockerfile }} \
-            -t ${{ env.IMAGE }} \
+            -t ${{ env.REPO }}:${{ env.SVC }} \
+            -t ${{ env.REPO }}:${{ env.SVC }}-${SHORT_SHA} \
             ${{ steps.ctx.outputs.context }}
 
       - name: Trivy security scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
-          image-ref: ${{ env.IMAGE }}
+          image-ref: ${{ env.REPO }}:${{ env.SVC }}
           severity: HIGH,CRITICAL
           exit-code: 0
           vuln-type: os,library
 
       - name: Push image to Docker Hub
-        run: docker push ${{ env.IMAGE }}
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          docker push ${{ env.REPO }}:${{ env.SVC }}
+          docker push ${{ env.REPO }}:${{ env.SVC }}-${SHORT_SHA}
 
   # -----------------------------------------------
   # Job 3 — Deploy to AKS via Helm (CD)
@@ -170,13 +176,14 @@ jobs:
 
       - name: Deploy to AKS
         run: |
+          SHORT_SHA=${GITHUB_SHA::7}
           SET_FLAGS=""
           if [ "${{ needs.detect.outputs.src_changed }}" = "true" ]; then
             SERVICES='${{ needs.detect.outputs.services }}'
             for svc in $(echo "$SERVICES" | jq -r '.[]'); do
               SET_FLAGS="$SET_FLAGS \
                 --set images.${svc}.repository=${{ secrets.DOCKERHUB_USERNAME }}/boutique-app \
-                --set images.${svc}.tag=${svc}"
+                --set images.${svc}.tag=${svc}-${SHORT_SHA}"
             done
           fi
 

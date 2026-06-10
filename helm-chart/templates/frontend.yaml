@@ -75,6 +75,7 @@ spec:
             privileged: false
             readOnlyRootFilesystem: true
           image: {{ .Values.images.frontend.repository }}:{{ .Values.images.frontend.tag | default .Chart.AppVersion }}
+          imagePullPolicy: Always
           ports:
           - containerPort: 8080
           readinessProbe:
