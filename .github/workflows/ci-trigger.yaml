@@ -69,7 +69,7 @@ jobs:
         service: ${{ fromJson(needs.detect.outputs.services) }}
 
     env:
-      IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/microservices-demo-${{ matrix.service }}:sha-${{ github.sha }}
+      IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/boutique-app:${{ matrix.service }}
 
     steps:
       - name: Checkout
@@ -175,8 +175,8 @@ jobs:
             SERVICES='${{ needs.detect.outputs.services }}'
             for svc in $(echo "$SERVICES" | jq -r '.[]'); do
               SET_FLAGS="$SET_FLAGS \
-                --set images.${svc}.repository=${{ secrets.DOCKERHUB_USERNAME }}/microservices-demo-${svc} \
-                --set images.${svc}.tag=sha-${{ github.sha }}"
+                --set images.${svc}.repository=${{ secrets.DOCKERHUB_USERNAME }}/boutique-app \
+                --set images.${svc}.tag=${svc}"
             done
           fi
 
