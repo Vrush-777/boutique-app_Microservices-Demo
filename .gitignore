@@ -18,8 +18,8 @@
 *.tfstate*
 *.tfvars
 *~
-# Contains a live Azure Cache for Redis access key — never commit
-helm-chart/values-azure-redis.yaml
+# values-azure-redis.yaml is safe to commit — connectionString is empty here;
+# the real key is injected at deploy time via --set from a CI secret.
 bin/
 build/
 Dockerfile.pip

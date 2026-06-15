@@ -1,0 +1,29 @@
+# Helm override to point the cart service at Azure Cache for Redis
+# instead of the in-cluster redis-cart pod.
+#
+# Usage:
+#   helm upgrade -i onlineboutique ./helm-chart \
+#     -f helm-chart/values.yaml \
+#     -f helm-chart/values-azure-redis.yaml \
+#     -n boutique-app
+#
+# This file is OPT-IN. If you don't pass it with -f, the chart behaves exactly
+# as before (in-cluster redis-cart pod). The default values.yaml is unchanged.
+
+cartDatabase:
+  type: redis
+  # StackExchange.Redis connection string â€” supports password and TLS inline.
+  # Replace <name> and <access-key> with values from the Azure portal or
+  # the `redis_hostname` / `redis_primary_key` Terraform outputs.
+  #
+  # SSL (port 6380, recommended):
+  #   connectionString: "<name>.redis.cache.windows.net:6380,password=<access-key>,ssl=True,abortConnect=False"
+  #
+  # Non-SSL (port 6379, only if explicitly enabled on the Azure cache):
+  #   connectionString: "<name>.redis.cache.windows.net:6379"
+  #connectionString: "<name>.redis.cache.windows.net:6380,password=<access-key>,ssl=True,abortConnect=False"
+  connectionString: ""   # DO NOT set here — pass via --set at deploy time
+
+  inClusterRedis:
+    # Stop deploying the in-cluster redis-cart pod; we use Azure Cache for Redis instead.
+    create: false
