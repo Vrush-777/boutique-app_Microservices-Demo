@@ -192,6 +192,8 @@ jobs:
             --create-namespace \
             --values ./helm-chart/values.yaml \
             --values ./helm-chart/values-aks.yaml \
+            --values ./helm-chart/values-azure-redis.yaml \
+            --set "cartDatabase.connectionString=${{ secrets.AZURE_REDIS_CONN_STRING }}" \
             $SET_FLAGS \
             --wait \
             --timeout 5m
