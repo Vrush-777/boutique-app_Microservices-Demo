@@ -1644,7 +1644,73 @@ Access the website `app.devopsdock.site`
 
 It should be accessible.
 
-# Cart Persistence with Amazon ElastiCache (Redis)
+# Cart Persistence with a Managed Redis
+
+The cart is the only stateful service. By default its Redis runs as an **in-cluster pod** (`redis-cart`) backed by an `emptyDir` volume — so **cart data is lost whenever that pod restarts**. We move it to a **managed Redis** so carts survive pod and node failures.
+
+> [!NOTE]
+> No application code change is needed. The cart sets `options.Configuration = REDIS_ADDR` ([src/cartservice/src/Startup.cs](src/cartservice/src/Startup.cs)), which is a full **StackExchange.Redis configuration string** — so it accepts `host:port` *and* `password=...,ssl=True` inline. We only repoint it via Helm values and stop deploying the in-cluster Redis pod.
+
+Choose the guide for the cloud you deploy to:
+
+| Cloud | Managed service | Override file | Full guide |
+| --- | --- | --- | --- |
+| **Azure (AKS)** — *this project's deployment* | Azure Cache for Redis | `helm-chart/values-azure-redis.yaml` | [docs/azure-cache-setup.md](docs/azure-cache-setup.md) |
+| AWS (EKS) — *reference only* | Amazon ElastiCache | `helm-chart/values-elasticache.yaml` | [docs/elasticache-setup.md](docs/elasticache-setup.md) |
+
+---
+
+## Azure Cache for Redis (active deployment)
+
+> [!TIP]
+> StackExchange.Redis performs TLS itself, so Azure's required TLS works with **no Istio** — we just pass `ssl=True` + the access key in the connection string.
+
+1. **Create the cache** — Azure Portal → *Create a resource → Azure Cache for Redis*, in the **same resource group/region as your AKS cluster**:
+   - DNS name `boutique-cart-redis`, SKU **Basic**, size **C0 (250 MB)**, TLS left **enabled** (port 6380). Wait until status is **Running**.
+2. **Get** the **Host name** (Overview) and **Primary access key** (Settings → Authentication / Access keys).
+3. **Wire it up** in `helm-chart/values-azure-redis.yaml` (opt-in override; `values.yaml` stays untouched):
+
+   ```yaml
+   cartDatabase:
+     type: redis
+     connectionString: "boutique-cart-redis.redis.cache.windows.net:6380,password=<PRIMARY_ACCESS_KEY>,ssl=True,abortConnect=False"
+     inClusterRedis:
+       create: false
+   ```
+
+   > [!WARNING]
+   > The access key is a secret. This file is in `.gitignore` so it is **not** committed. For production, use a Kubernetes Secret instead of an inline key.
+
+4. **Deploy** on AKS:
+
+   ```bash
+   helm upgrade -i onlineboutique ./helm-chart \
+     -f helm-chart/values.yaml \
+     -f helm-chart/values-azure-redis.yaml \
+     -n boutique-app
+   ```
+
+5. **Verify** persistence:
+
+   ```bash
+   kubectl get pod -n boutique-app | grep redis    # → no redis-cart pod
+   kubectl delete pod -l app=cartservice -n boutique-app
+   ```
+
+   Add items to the cart, kill the cart pod (above), reload → **the cart still has your items**. ✅
+
+> [!NOTE]
+> Azure Cache for Redis has **no free tier** (Basic C0 ≈ $16/month). Delete it when finished:
+> `az redis delete --name boutique-cart-redis --resource-group <rg> --yes`
+
+Full step-by-step (with CLI alternatives and troubleshooting): **[docs/azure-cache-setup.md](docs/azure-cache-setup.md)**.
+
+---
+
+# (AWS reference only) Cart Persistence with Amazon ElastiCache (Redis)
+
+> [!IMPORTANT]
+> This section applies **only if you deploy on AWS EKS**. It does **not** work for the Azure deployment above — use the Azure Cache for Redis section instead.
 
 By default the cart's Redis runs as an **in-cluster pod** (`redis-cart`) backed by an `emptyDir` volume — so **cart data is lost whenever that pod restarts**. Here we move it to a **managed Amazon ElastiCache (Redis)** so carts survive pod and node failures.
 
