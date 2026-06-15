@@ -196,7 +196,7 @@ jobs:
             --set "cartDatabase.connectionString=${{ secrets.AZURE_REDIS_CONN_STRING }}" \
             $SET_FLAGS \
             --wait \
-            --timeout 5m
+            --timeout 10m
 
       - name: Apply Ingress
         run: kubectl apply -f microservices-extra-kube-manifests/ingress-aks.yaml
