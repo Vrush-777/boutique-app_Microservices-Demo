@@ -1,0 +1,19 @@
+# Helm override to point the cart service at Amazon ElastiCache (Redis)
+# instead of the in-cluster redis-cart pod.
+#
+# Usage:
+#   helm upgrade -i onlineboutique ./helm-chart \
+#     -f helm-chart/values.yaml \
+#     -f helm-chart/values-elasticache.yaml
+#
+# This file is OPT-IN. If you don't pass it with -f, the chart behaves exactly
+# as before (in-cluster redis-cart pod). The default values.yaml is unchanged.
+
+cartDatabase:
+  type: redis
+  # Replace with the `redis_endpoint` output from terraform/elasticache
+  # (or the ElastiCache "Primary endpoint" from the AWS console).
+  connectionString: "clustercfg.dass-test.55h0nj.aps1.cache.amazonaws.com:6379"
+  inClusterRedis:
+    # Stop deploying the in-cluster redis-cart pod; we use ElastiCache instead.
+    create: false

@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and fill in the values from your EKS cluster's VPC.
+
+region      = "us-east-1"
+name_prefix = "boutique"
+
+# VPC + private subnets of your EKS cluster (cache must be in the SAME VPC):
+vpc_id     = "vpc-xxxxxxxxxxxxxxxxx"
+subnet_ids = ["subnet-aaaaaaaa", "subnet-bbbbbbbb"]
+
+# Allow the EKS worker nodes to reach Redis on 6379. Use one (or both):
+allowed_security_group_ids = ["sg-xxxxxxxxxxxxxxxxx"] # EKS node security group
+# allowed_cidr_blocks      = ["10.0.0.0/16"]           # or the VPC CIDR (fallback)
+
+node_type      = "cache.t4g.micro" # free-tier eligible
+engine_version = "7.1"

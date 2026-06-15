@@ -18,6 +18,8 @@
 *.tfstate*
 *.tfvars
 *~
+# Contains a live Azure Cache for Redis access key — never commit
+helm-chart/values-azure-redis.yaml
 bin/
 build/
 Dockerfile.pip

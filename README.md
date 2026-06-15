@@ -1644,6 +1644,128 @@ Access the website `app.devopsdock.site`
 
 It should be accessible.
 
+# Cart Persistence with Amazon ElastiCache (Redis)
+
+By default the cart's Redis runs as an **in-cluster pod** (`redis-cart`) backed by an `emptyDir` volume — so **cart data is lost whenever that pod restarts**. Here we move it to a **managed Amazon ElastiCache (Redis)** so carts survive pod and node failures.
+
+> [!IMPORTANT]
+> ElastiCache is reachable **only from inside the same AWS VPC**. Your app must run on **AWS EKS** (the setup described above). It is **not** reachable from a cluster running in another cloud.
+
+> [!NOTE]
+> The cart needs **no code change**. It reads `REDIS_ADDR` from `cartDatabase.connectionString` in the Helm values. We only point it at the ElastiCache endpoint and stop deploying the in-cluster Redis pod.
+
+> [!TIP]
+> We use ElastiCache with **in-transit encryption disabled** (plain TCP, no AUTH). The chart's TLS path needs an Istio sidecar, which this setup doesn't run — so disabling TLS keeps it simple and working.
+
+## Option A — Provision with Terraform (recommended)
+
+A ready-to-use module lives in `terraform/elasticache/`.
+
+```bash
+cd terraform/elasticache
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit `terraform.tfvars` and fill in your EKS cluster's VPC details:
+
+- `vpc_id` — the VPC of your EKS cluster
+- `subnet_ids` — the private subnets in that VPC
+- `allowed_security_group_ids` — your EKS **node** security group (so worker nodes can reach Redis)
+
+Then:
+
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+Grab the endpoint:
+
+```bash
+terraform output redis_endpoint
+# e.g. boutique-cart-redis.xxxx.0001.use1.cache.amazonaws.com:6379
+```
+
+## Option B — Provision in the AWS Console
+
+`ElastiCache → Create cache`, and select:
+
+| Field | Choose |
+| --- | --- |
+| **Engine** | **Redis OSS** |
+| **Deployment option** | **Node-based cluster**  ⚠️ *(NOT Serverless — Serverless forces TLS on, which the cart can't do without Istio)* |
+| **Creation method** | New cache |
+| **Cluster mode** | **Disabled** |
+| **Name** | `boutique-cart-redis` |
+| **Node type** | `cache.t4g.micro` (free-tier eligible) |
+| **Number of replicas** | `0` |
+| **Subnet group** | one in the **same VPC** as your EKS cluster |
+| **Encryption in-transit** | **OFF** |
+| **AUTH / password** | none |
+| **Security group** | allow inbound **TCP 6379** from the **EKS node security group** (or the VPC CIDR) |
+
+After it's created, copy the **Primary endpoint** (e.g. `boutique-cart-redis.xxxx.cache.amazonaws.com:6379`).
+
+## Wire the cart to ElastiCache
+
+Open `helm-chart/values-elasticache.yaml` and paste your endpoint:
+
+```yaml
+cartDatabase:
+  type: redis
+  connectionString: "boutique-cart-redis.xxxx.cache.amazonaws.com:6379"
+  inClusterRedis:
+    create: false   # stop deploying the in-cluster redis-cart pod
+```
+
+Deploy with the override (the default `values.yaml` is untouched, so this is opt-in):
+
+```bash
+helm upgrade -i onlineboutique ./helm-chart \
+  -f helm-chart/values.yaml \
+  -f helm-chart/values-elasticache.yaml \
+  -n boutique-app
+```
+
+> [!TIP]
+> **GitOps (Argo CD):** instead of running Helm directly, commit `values-elasticache.yaml` and reference it from your Kustomize/Argo source so Argo CD syncs the change.
+
+## Verify cart persistence
+
+1. Open the site and **add a few items to the cart**.
+2. Kill the cart pod:
+
+   ```bash
+   kubectl delete pod -l app=cartservice -n boutique-app
+   ```
+
+3. Reload the site → **the cart still has your items** (the data lived in ElastiCache, not the pod).
+4. Confirm the old in-cluster Redis pod is gone:
+
+   ```bash
+   kubectl get pod -n boutique-app | grep redis
+   # (no redis-cart pod should be listed)
+   ```
+
+5. *(Optional)* Inspect the keys directly from a debug pod in the cluster:
+
+   ```bash
+   kubectl run redis-cli --rm -it --image=redis:alpine -n boutique-app -- \
+     redis-cli -h <elasticache-endpoint> KEYS '*'
+   ```
+
+## Cost & cleanup
+
+- `cache.t4g.micro` is **free-tier eligible** (750 hrs/month for 12 months); otherwise ~$12/month.
+- Tear down with:
+
+  ```bash
+  cd terraform/elasticache && terraform destroy
+  ```
+
+  (or delete the cache in the console).
+
 # Observability
 
 We generally dont manage the observability stack by Argocd. Because anyone having access to Argocd can modify it.
