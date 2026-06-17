@@ -1,0 +1,139 @@
+================================================================================
+  NITOR INFOTECH DaaS — Deployment Strategy Configuration
+  Source: boutique-app_Microservices-Demo
+  Generated: 2026-06-17
+================================================================================
+
+GLOBAL DEPLOYMENT SETTINGS
+--------------------------------------------------------------------------------
+Docker Container Registry : daasdeployment.azurecr.io
+Deployment Strategy       : rolling
+Image Tag Pattern          : git-sha
+
+================================================================================
+SERVICE ENVIRONMENT VARIABLES
+================================================================================
+
+SERVICE: frontend
+--------------------------------------------------------------------------------
+AD_SERVICE_ADDR                  = adservice:9555
+CART_SERVICE_ADDR                = cartservice:7070
+CHECKOUT_SERVICE_ADDR            = checkoutservice:5050
+CURRENCY_SERVICE_ADDR            = currencyservice:7000
+CYMBAL_BRANDING                  = false
+ENV_PLATFORM                     = azure
+GOTRACEBACK                      = single
+PORT                             = 8080
+PRODUCT_CATALOG_SERVICE_ADDR     = productcatalogservice:3550
+RECOMMENDATION_SERVICE_ADDR      = recommendationservice:8080
+SHIPPING_SERVICE_ADDR            = shippingservice:50051
+SHOPPING_ASSISTANT_SERVICE_ADDR  = shoppingassistantservice:80
+SKAFFOLD_GO_GCFLAGS              = (leave empty — build-time ARG only)
+TARGETARCH                       = amd64
+TARGETOS                         = linux
+
+SERVICE: adservice
+--------------------------------------------------------------------------------
+PORT                             = 9555
+
+SERVICE: cartservice
+--------------------------------------------------------------------------------
+DOTNET_EnableDiagnostics         = 0
+PORT                             = 7070
+REDIS_ADDR                       = boutique-cart-redis.redis.cache.windows.net:6380,password=<YOUR_KEY>,ssl=True,abortConnect=False
+TARGETARCH                       = amd64
+
+  NOTE: REDIS_ADDR contains the Azure Cache for Redis access key.
+        Use the value stored in the AZURE_REDIS_CONN_STRING GitHub secret.
+        Never commit the real key to this file.
+
+SERVICE: emailservice
+--------------------------------------------------------------------------------
+DISABLE_PROFILER                 = 1
+ENABLE_PROFILER                  = 0
+PORT                             = 5000
+PYTHONDONTWRITEBYTECODE          = 1
+PYTHONUNBUFFERED                 = 1
+
+SERVICE: loadgenerator
+--------------------------------------------------------------------------------
+FRONTEND_ADDR                    = frontend:80
+GEVENT_SUPPORT                   = True
+PYTHONDONTWRITEBYTECODE          = 1
+PYTHONUNBUFFERED                 = 1
+USERS                            = 10
+
+SERVICE: paymentservice
+--------------------------------------------------------------------------------
+DISABLE_PROFILER                 = 1
+PORT                             = 50051
+
+SERVICE: checkoutservice
+--------------------------------------------------------------------------------
+CART_SERVICE_ADDR                = cartservice:7070
+CURRENCY_SERVICE_ADDR            = currencyservice:7000
+EMAIL_SERVICE_ADDR               = emailservice:5000
+GOTRACEBACK                      = single
+PAYMENT_SERVICE_ADDR             = paymentservice:50051
+PORT                             = 5050
+PRODUCT_CATALOG_SERVICE_ADDR     = productcatalogservice:3550
+SHIPPING_SERVICE_ADDR            = shippingservice:50051
+SKAFFOLD_GO_GCFLAGS              = (leave empty — build-time ARG only)
+TARGETARCH                       = amd64
+TARGETOS                         = linux
+
+SERVICE: currencyservice
+--------------------------------------------------------------------------------
+DISABLE_PROFILER                 = 1
+PORT                             = 7000
+
+SERVICE: shippingservice
+--------------------------------------------------------------------------------
+APP_PORT                         = 50051
+DISABLE_PROFILER                 = 1
+GOTRACEBACK                      = single
+PORT                             = 50051
+SKAFFOLD_GO_GCFLAGS              = (leave empty — build-time ARG only)
+TARGETARCH                       = amd64
+TARGETOS                         = linux
+
+SERVICE: productcatalogservice
+--------------------------------------------------------------------------------
+DISABLE_PROFILER                 = 1
+GOTRACEBACK                      = single
+PORT                             = 3550
+SKAFFOLD_GO_GCFLAGS              = (leave empty — build-time ARG only)
+TARGETARCH                       = amd64
+TARGETOS                         = linux
+
+SERVICE: recommendationservice
+--------------------------------------------------------------------------------
+DISABLE_PROFILER                 = 1
+PORT                             = 8080
+PRODUCT_CATALOG_SERVICE_ADDR     = productcatalogservice:3550
+PYTHONDONTWRITEBYTECODE          = 1
+PYTHONUNBUFFERED                 = 1
+
+SERVICE: shoppingassistantservice
+--------------------------------------------------------------------------------
+PORT                             = 80
+PYTHONUNBUFFERED                 = 1
+
+================================================================================
+NOTES
+================================================================================
+- SKAFFOLD_GO_GCFLAGS, TARGETARCH, TARGETOS are Dockerfile build-time ARGs.
+  Leave them empty in the DaaS form unless the platform requires them.
+
+- REDIS_ADDR (cartservice) is sensitive. The placeholder above shows the
+  format only. Get the real value from:
+    Azure Portal -> boutique-cart-redis -> Authentication -> Access keys
+    Connection string (StackExchange.Redis): Primary connection string
+
+- DISABLE_PROFILER=1 disables Google Cloud Profiler on all Python/Go services.
+  Required for non-GCP deployments (AKS does not have Cloud Profiler).
+
+- Inter-service addresses use Kubernetes ClusterIP DNS:
+    <service-name>:<port>
+  These resolve inside the boutique-app namespace automatically.
+================================================================================
