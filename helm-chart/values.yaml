@@ -236,7 +236,7 @@ cartDatabase:
   connectionString: ""
   inClusterRedis:
     create: false
-    name: redis-cart
+    name: redis-cart-disabled
     # Uses the public redis image from Docker Hub, otherwise will use the images.repository.
     publicRepository: true
   externalRedisTlsOrigination:
