@@ -233,9 +233,9 @@ shippingService:
 cartDatabase:
   # Specifies the type of the cartservice's database, could be either redis or spanner.
   type: redis
-  connectionString: "redis-cart:6379"
+  connectionString: ""
   inClusterRedis:
-    create: true
+    create: false
     name: redis-cart
     # Uses the public redis image from Docker Hub, otherwise will use the images.repository.
     publicRepository: true
