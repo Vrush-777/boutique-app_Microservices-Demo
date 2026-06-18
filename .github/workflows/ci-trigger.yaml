@@ -196,13 +196,15 @@ jobs:
             done
           fi
 
+          REDIS_CONN="${{ secrets.AZURE_REDIS_HOST }}:${{ secrets.AZURE_REDIS_PORT }},password=${{ secrets.AZURE_REDIS_PASSWORD }},ssl=True,abortConnect=False"
+
           helm upgrade --install ${{ env.RELEASE_NAME }} ./helm-chart \
             --namespace ${{ env.NAMESPACE }} \
             --create-namespace \
             --values ./helm-chart/values.yaml \
             --values ./helm-chart/values-aks.yaml \
             --set "cartDatabase.inClusterRedis.create=false" \
-            --set "cartDatabase.connectionString=${{ secrets.AZURE_REDIS_CONN_STRING }}" \
+            --set "cartDatabase.connectionString=${REDIS_CONN}" \
             $SET_FLAGS \
             --wait \
             --timeout 15m
