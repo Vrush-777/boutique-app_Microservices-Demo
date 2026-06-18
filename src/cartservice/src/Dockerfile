@@ -36,6 +36,8 @@ WORKDIR /app
 COPY --from=builder /cartservice .
 EXPOSE 7070
 ENV DOTNET_EnableDiagnostics=0 \
-    ASPNETCORE_HTTP_PORTS=7070
+    ASPNETCORE_HTTP_PORTS=7070 \
+    REDIS_ADDR=""
+    AZURE_REDIS_HOST=""
 USER 1000
 ENTRYPOINT ["/app/cartservice"]
