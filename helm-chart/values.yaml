@@ -103,16 +103,16 @@ adService:
       cpu: 300m
       memory: 300Mi
 
-cartService:
-  create: true
-  name: cartservice
-  resources:
-    requests:
-      cpu: 200m
-      memory: 128Mi
-    limits:
-      cpu: 300m
-      memory: 256Mi
+# cartService:
+#   create: true
+#   name: cartservice
+#   resources:
+#     requests:
+#       cpu: 200m
+#       memory: 128Mi
+#     limits:
+#       cpu: 300m
+#       memory: 256Mi
 
 checkoutService:
   create: true
@@ -233,10 +233,10 @@ shippingService:
 cartDatabase:
   # Specifies the type of the cartservice's database, could be either redis or spanner.
   type: redis
-  connectionString: "redis-cart:6379"
+  connectionString: ""
   inClusterRedis:
-    create: true
-    name: redis-cart
+    create: false
+    name: redis-cart-disabled
     # Uses the public redis image from Docker Hub, otherwise will use the images.repository.
     publicRepository: true
   externalRedisTlsOrigination:

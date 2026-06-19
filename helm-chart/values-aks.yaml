@@ -3,3 +3,6 @@ frontend:
 
 imagePullSecrets:
   - name: dockerhub-pull-secret
+
+loadGenerator:
+  create: false

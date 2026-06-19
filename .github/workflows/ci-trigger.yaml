@@ -37,8 +37,13 @@ jobs:
       - name: Detect changes and list services
         id: detect
         run: |
-          SRC_CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} \
-            | grep -c '^src/' || true)
+          BEFORE="${{ github.event.before }}"
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            SRC_CHANGED=0
+          else
+            SRC_CHANGED=$(git diff --name-only "$BEFORE" "${{ github.sha }}" \
+              | grep -c '^src/' || true)
+          fi
 
           if [ "$SRC_CHANGED" -gt "0" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "src_changed=true" >> $GITHUB_OUTPUT
@@ -168,11 +173,15 @@ jobs:
             --docker-password=${{ secrets.DOCKERHUB_TOKEN }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Fix Helm field-manager conflict on frontend Service
+      - name: Transfer frontend Service ownership to Helm
         run: |
-          kubectl delete service frontend \
-            --namespace ${{ env.NAMESPACE }} \
-            --ignore-not-found
+          kubectl annotate service frontend \
+            meta.helm.sh/release-name=${{ env.RELEASE_NAME }} \
+            meta.helm.sh/release-namespace=${{ env.NAMESPACE }} \
+            --overwrite -n ${{ env.NAMESPACE }} 2>/dev/null || true
+          kubectl label service frontend \
+            app.kubernetes.io/managed-by=Helm \
+            --overwrite -n ${{ env.NAMESPACE }} 2>/dev/null || true
 
       - name: Deploy to AKS
         run: |
@@ -187,14 +196,18 @@ jobs:
             done
           fi
 
+          REDIS_CONN="${{ secrets.AZURE_REDIS_HOST }}:${{ secrets.AZURE_REDIS_PORT }},password=${{ secrets.AZURE_REDIS_PASSWORD }},ssl=True,abortConnect=False"
+
           helm upgrade --install ${{ env.RELEASE_NAME }} ./helm-chart \
             --namespace ${{ env.NAMESPACE }} \
             --create-namespace \
             --values ./helm-chart/values.yaml \
             --values ./helm-chart/values-aks.yaml \
+            --set "cartDatabase.inClusterRedis.create=false" \
+            --set "cartDatabase.connectionString=${REDIS_CONN}" \
             $SET_FLAGS \
             --wait \
-            --timeout 5m
+            --timeout 15m
 
       - name: Apply Ingress
         run: kubectl apply -f microservices-extra-kube-manifests/ingress-aks.yaml
