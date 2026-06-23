@@ -17,70 +17,107 @@
 {{ define "product" }}
 {{ template "header" . }}
 <div {{ with $.platform_css }} class="{{.}}" {{ end }}>
-  <span class="platform-flag">
-    {{$.platform_name}}
-  </span>
+  <span class="platform-flag">{{$.platform_name}}</span>
 </div>
 
-<main role="main">
+<main role="main" class="product-page">
+
+  <!-- Breadcrumb -->
+  <nav class="product-breadcrumb" aria-label="Breadcrumb">
+    <div class="container">
+      <ol class="breadcrumb-list">
+        <li><a href="{{ $.baseUrl }}/">Home</a></li>
+        <li aria-hidden="true">/</li>
+        <li aria-current="page">{{ $.product.Item.Name }}</li>
+      </ol>
+    </div>
+  </nav>
+
+  <!-- Product Detail -->
   <div class="h-product container">
-    <div class="row">
-      <div class="col-md-6">
-        <img class="product-image" alt="" src="{{ $.baseUrl }}{{$.product.Item.Picture}}" />
+    <div class="row align-items-start">
+
+      <!-- Image column -->
+      <div class="col-md-6 product-img-col">
+        <div class="product-img-wrap">
+          <img class="product-image" alt="{{ $.product.Item.Name }}" src="{{ $.baseUrl }}{{ $.product.Item.Picture }}" />
+          <span class="product-img-badge">New Arrival</span>
+        </div>
       </div>
-      <div class="product-info col-md-5">
+
+      <!-- Info column -->
+      <div class="col-md-6 product-info">
         <div class="product-wrapper">
 
-          <h2>{{ $.product.Item.Name }}</h2>
+          <!-- Stars -->
+          <div class="product-stars" aria-label="5 out of 5 stars">
+            <span aria-hidden="true">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+            <span class="product-review-count">(128 reviews)</span>
+          </div>
+
+          <h1 class="product-name">{{ $.product.Item.Name }}</h1>
           <p class="product-price">{{ renderMoney $.product.Price }}</p>
-          <p>{{ $.product.Item.Description }}</p>
+          <p class="product-desc">{{ $.product.Item.Description }}</p>
 
           {{ if $.packagingInfo }}
           <div class="product-packaging">
-            <h3>Packaging</h3>
-            <span>
-              Weight: {{ if $.packagingInfo.Weight }}{{ $.packagingInfo.Weight }}lb{{ else }}n/a{{ end }}
-            </span>
-            <span>
-              Width: {{ if $.packagingInfo.Width }}{{ $.packagingInfo.Width }}cm{{ else }}n/a{{ end }}
-            </span>
-            <span>
-              Height: {{ if $.packagingInfo.Height }}{{ $.packagingInfo.Height }}cm{{ else }}n/a{{ end }}
-            </span>
-            <span>
-              Depth: {{ if $.packagingInfo.Depth }}{{ $.packagingInfo.Depth }}cm{{ else }}n/a{{ end }}
-            </span>
+            <h3>Packaging Info</h3>
+            <div class="packaging-grid">
+              <span>Weight: {{ if $.packagingInfo.Weight }}{{ $.packagingInfo.Weight }} lb{{ else }}n/a{{ end }}</span>
+              <span>Width: {{ if $.packagingInfo.Width }}{{ $.packagingInfo.Width }} cm{{ else }}n/a{{ end }}</span>
+              <span>Height: {{ if $.packagingInfo.Height }}{{ $.packagingInfo.Height }} cm{{ else }}n/a{{ end }}</span>
+              <span>Depth: {{ if $.packagingInfo.Depth }}{{ $.packagingInfo.Depth }} cm{{ else }}n/a{{ end }}</span>
+            </div>
           </div>
           {{ end }}
 
-          <form method="POST" action="{{ $.baseUrl }}/cart">
-            <input type="hidden" name="product_id" value="{{$.product.Item.Id}}" />
-            <div class="product-quantity-dropdown">
-              <select name="quantity" id="quantity">
-                <option>1</option>
-                <option>2</option>
-                <option>3</option>
-                <option>4</option>
-                <option>5</option>
-                <option>10</option>
-              </select>
-              <img src="{{ $.baseUrl }}/static/icons/Hipster_DownArrow.svg" alt="">
+          <!-- Add to cart -->
+          <form method="POST" action="{{ $.baseUrl }}/cart" class="product-add-form">
+            <input type="hidden" name="product_id" value="{{ $.product.Item.Id }}" />
+
+            <div class="product-form-row">
+              <div class="product-quantity-dropdown">
+                <label for="quantity" class="sr-only">Quantity</label>
+                <select name="quantity" id="quantity">
+                  <option>1</option>
+                  <option>2</option>
+                  <option>3</option>
+                  <option>4</option>
+                  <option>5</option>
+                  <option>10</option>
+                </select>
+                <img src="{{ $.baseUrl }}/static/icons/Hipster_DownArrow.svg" alt="" aria-hidden="true">
+              </div>
+              <button type="submit" class="cymbal-button-primary product-add-btn">
+                Add to Cart &rarr;
+              </button>
             </div>
-            <button type="submit" class="cymbal-button-primary">Add To Cart</button>
           </form>
+
+          <!-- Trust mini-row -->
+          <div class="product-trust">
+            <span>🚚 Free shipping</span>
+            <span>🔄 Easy returns</span>
+            <span>🔒 Secure checkout</span>
+          </div>
+
         </div>
       </div>
+
     </div>
   </div>
-  <div>
-    {{ if $.recommendations}}
-      {{ template "recommendations" $ }}
-    {{ end }}
-  </div>
+
+  <!-- Recommendations -->
+  {{ if $.recommendations }}
+  {{ template "recommendations" $ }}
+  {{ end }}
+
+  <!-- Ad -->
   <div class="ad">
-   {{ if $.ad }}{{ template "text_ad" $ }}{{ end }}
+    {{ if $.ad }}{{ template "text_ad" $ }}{{ end }}
   </div>
 
 </main>
+
 {{ template "footer" . }}
 {{ end }}

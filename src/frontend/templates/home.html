@@ -18,63 +18,239 @@
 
 {{ template "header" . }}
 <div {{ with $.platform_css }} class="{{.}}" {{ end }}>
-  <span class="platform-flag">
-    {{$.platform_name}}
-  </span>
+  <span class="platform-flag">{{$.platform_name}}</span>
 </div>
+
 <main role="main" class="home">
 
-  <!-- The image at the top of the home page, displayed on smaller screens. -->
-  <div class="home-mobile-hero-banner d-lg-none"></div>
+  <!-- ===== HERO ===== -->
+  <section class="hero-section" aria-label="Hero banner">
+    <div class="hero-orbs" aria-hidden="true">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+    <div class="hero-content">
+      <span class="hero-badge">New Collection 2026</span>
+      <h1 class="hero-title">
+        Curated Style<br>
+        for Modern <em>Living</em>
+      </h1>
+      <p class="hero-subtitle">Premium products, thoughtfully selected and delivered to your door.</p>
+      <div class="hero-actions">
+        <a href="#products" class="btn-hero-primary">Shop Now &nbsp;&rarr;</a>
+        <a href="#products" class="btn-hero-secondary">Explore Collection</a>
+      </div>
+      <div class="hero-stats" aria-label="Store highlights">
+        <div class="hero-stat">
+          <span class="hero-stat-num">9+</span>
+          <span class="hero-stat-label">Products</span>
+        </div>
+        <div class="hero-stat-divider" aria-hidden="true"></div>
+        <div class="hero-stat">
+          <span class="hero-stat-num">100%</span>
+          <span class="hero-stat-label">Premium</span>
+        </div>
+        <div class="hero-stat-divider" aria-hidden="true"></div>
+        <div class="hero-stat">
+          <span class="hero-stat-num">Free</span>
+          <span class="hero-stat-label">Shipping</span>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <div class="container-fluid">
+  <!-- ===== TRUST BADGES ===== -->
+  <section class="trust-section" aria-label="Store promises">
+    <div class="container-fluid">
+      <div class="trust-row">
+        <div class="trust-item">
+          <span class="trust-icon" aria-hidden="true">🚚</span>
+          <div>
+            <div class="trust-title">Free Shipping</div>
+            <div class="trust-desc">On all orders</div>
+          </div>
+        </div>
+        <div class="trust-item">
+          <span class="trust-icon" aria-hidden="true">🔄</span>
+          <div>
+            <div class="trust-title">Easy Returns</div>
+            <div class="trust-desc">30-day policy</div>
+          </div>
+        </div>
+        <div class="trust-item">
+          <span class="trust-icon" aria-hidden="true">🔒</span>
+          <div>
+            <div class="trust-title">Secure Payment</div>
+            <div class="trust-desc">256-bit encrypted</div>
+          </div>
+        </div>
+        <div class="trust-item">
+          <span class="trust-icon" aria-hidden="true">⭐</span>
+          <div>
+            <div class="trust-title">5-Star Support</div>
+            <div class="trust-desc">Always here for you</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== LUXURY JEWELLERY BRANDS ===== -->
+  <section class="jewellery-section" aria-label="Luxury jewellery houses">
+    <div class="container-fluid">
+
+      <div class="jewellery-header">
+        <span class="jewellery-eyebrow">Haute Joaillerie</span>
+        <h2 class="jewellery-title">World's Finest Jewellery Houses</h2>
+        <p class="jewellery-subtitle">Discover timeless pieces from the most iconic names in luxury jewellery</p>
+        <div class="jewellery-divider" aria-hidden="true">
+          <span class="jewellery-divider-line"></span>
+          <span class="jewellery-divider-diamond"></span>
+          <span class="jewellery-divider-line"></span>
+        </div>
+      </div>
+
+      <div class="jewellery-brands px-10-percent">
+
+        <!-- Cartier -->
+        <a href="#products" class="jewellery-brand-card" aria-label="Cartier — Iconic love bracelets and diamonds">
+          <div class="brand-monogram">C</div>
+          <div class="brand-name">Cartier</div>
+          <div class="brand-tagline">Iconic love bracelets &amp; diamonds</div>
+          <span class="brand-explore">Explore &rarr;</span>
+          <span class="brand-shimmer" aria-hidden="true"></span>
+        </a>
+
+        <!-- Tiffany & Co. -->
+        <a href="#products" class="jewellery-brand-card" aria-label="Tiffany and Co — Premium diamonds and silver">
+          <div class="brand-monogram">T</div>
+          <div class="brand-name">Tiffany &amp; Co.</div>
+          <div class="brand-tagline">Premium diamonds &amp; silver</div>
+          <span class="brand-explore">Explore &rarr;</span>
+          <span class="brand-shimmer" aria-hidden="true"></span>
+        </a>
+
+        <!-- Graff -->
+        <a href="#products" class="jewellery-brand-card" aria-label="Graff — Rarest diamonds in the world">
+          <div class="brand-monogram">G</div>
+          <div class="brand-name">Graff</div>
+          <div class="brand-tagline">Rarest diamonds in the world</div>
+          <span class="brand-explore">Explore &rarr;</span>
+          <span class="brand-shimmer" aria-hidden="true"></span>
+        </a>
+
+        <!-- Harry Winston -->
+        <a href="#products" class="jewellery-brand-card" aria-label="Harry Winston — Jeweller of the Stars">
+          <div class="brand-monogram">HW</div>
+          <div class="brand-name">Harry Winston</div>
+          <div class="brand-tagline">"Jeweller of the Stars"</div>
+          <span class="brand-explore">Explore &rarr;</span>
+          <span class="brand-shimmer" aria-hidden="true"></span>
+        </a>
+
+        <!-- Bulgari -->
+        <a href="#products" class="jewellery-brand-card" aria-label="Bulgari — Italian luxury jewels">
+          <div class="brand-monogram">BV</div>
+          <div class="brand-name">Bulgari</div>
+          <div class="brand-tagline">Italian luxury jewels</div>
+          <span class="brand-explore">Explore &rarr;</span>
+          <span class="brand-shimmer" aria-hidden="true"></span>
+        </a>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CATEGORIES ===== -->
+  <section class="categories-section" aria-label="Browse by category">
+    <div class="container">
+      <div class="categories-row" role="list">
+        <span class="category-chip active" role="listitem">All Products</span>
+        <span class="category-chip" role="listitem">Accessories</span>
+        <span class="category-chip" role="listitem">Kitchen</span>
+        <span class="category-chip" role="listitem">Fashion</span>
+        <span class="category-chip" role="listitem">Tech</span>
+        <span class="category-chip" role="listitem">Home Decor</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PRODUCTS GRID ===== -->
+  <div class="container-fluid" id="products">
     <div class="row">
+      <div class="col-12 px-10-percent">
 
-      <!-- The image on the left of the home page, displayed on larger screens. -->
-      <!--<div class="col-4 d-none d-lg-block home-desktop-left-image"></div>-->
-      <!-- @TODO: removed temporarily. When uncommenting, also replace below div with this -->
-      <!--<div class="col-12 col-lg-8">-->
-
-      <div class="col-12 col-lg-12 px-10-percent">
-
-        <div class="row hot-products-row px-xl-6">
-
-          <div class="col-12">
-            <h3>Hot Products</h3>
+        <div class="section-header">
+          <div class="section-header-text">
+            <h2 class="h3">Hot Products</h2>
+            <p class="section-subtitle">Trending picks, curated just for you</p>
           </div>
-
-          {{ range $.products }}
-          <div class="col-md-4 hot-product-card">
-            <a href="{{ $.baseUrl }}/product/{{.Item.Id}}">
-              <img loading="lazy" src="{{ $.baseUrl }}{{.Item.Picture}}">
-              <div class="hot-product-card-img-overlay"></div>
-            </a>
-            <div>
-              <div class="hot-product-card-name">{{ .Item.Name }}</div>
-              <div class="hot-product-card-price">{{ renderMoney .Price }}</div>
-            </div>
-          </div>
-          {{ end }}
-
+          <a href="#products" class="section-link">View all &rarr;</a>
         </div>
 
-        <!-- Footer for larger screens. -->
-        <div class="row d-none d-lg-block home-desktop-footer-row">
-          <div class="col-12 p-0">
-            {{ template "footer" . }}
+        <div class="row products-grid">
+          {{ range $.products }}
+          <div class="col-6 col-md-4 col-lg-3 product-card-wrapper">
+            <a href="{{ $.baseUrl }}/product/{{.Item.Id}}" class="product-card" aria-label="View {{.Item.Name}}">
+              <div class="product-card-image-wrap">
+                <img loading="lazy" src="{{ $.baseUrl }}{{.Item.Picture}}" alt="{{.Item.Name}}">
+                <div class="product-card-overlay" aria-hidden="true">
+                  <span class="quick-view-btn">View Product</span>
+                </div>
+                <span class="product-badge" aria-label="New arrival">New</span>
+                <button type="button" class="wishlist-btn" aria-label="Add {{.Item.Name}} to wishlist" tabindex="-1">&#9825;</button>
+              </div>
+              <div class="product-card-body">
+                <div class="product-card-name">{{ .Item.Name }}</div>
+                <div class="product-card-footer">
+                  <div class="product-card-price">{{ renderMoney .Price }}</div>
+                  <div class="product-card-stars" aria-label="5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+                </div>
+              </div>
+            </a>
           </div>
+          {{ end }}
         </div>
 
       </div>
+    </div>
+  </div>
 
+  <!-- Desktop footer -->
+  <div class="row d-none d-lg-block home-desktop-footer-row">
+    <div class="col-12 p-0">
+      {{ template "footer" . }}
     </div>
   </div>
 
 </main>
 
-<!-- Footer for smaller screens. -->
+<!-- Mobile footer -->
 <div class="d-lg-none">
   {{ template "footer" . }}
 </div>
+
+<script>
+(function () {
+  /* Category chip toggle — visual only */
+  var chips = document.querySelectorAll('.category-chip');
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      chips.forEach(function (c) { c.classList.remove('active'); });
+      this.classList.add('active');
+    });
+  });
+
+  /* Smooth-scroll hero CTA */
+  document.querySelectorAll('a[href="#products"]').forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var target = document.getElementById('products');
+      if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    });
+  });
+}());
+</script>
 
 {{ end }}
