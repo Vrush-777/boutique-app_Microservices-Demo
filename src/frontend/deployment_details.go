@@ -35,12 +35,21 @@ func initializeLogger() {
 
 func loadDeploymentDetails() {
 	deploymentDetailsMap = make(map[string]string)
-	var metaServerClient = metadata.NewClient(&http.Client{})
 
 	podHostname, err := os.Hostname()
 	if err != nil {
 		log.Error("Failed to fetch the hostname for the Pod", err)
 	}
+	deploymentDetailsMap["HOSTNAME"] = podHostname
+
+	// GCP-specific metadata — only query when actually running on GCP.
+	// On AWS/Azure/on-prem these calls always fail and produce noisy ERROR logs.
+	if !metadata.OnGCE() {
+		log.Debug("Not running on GCP, skipping cluster/zone metadata fetch")
+		return
+	}
+
+	var metaServerClient = metadata.NewClient(&http.Client{})
 
 	podCluster, err := metaServerClient.InstanceAttributeValue("cluster-name")
 	if err != nil {
@@ -52,7 +61,6 @@ func loadDeploymentDetails() {
 		log.Error("Failed to fetch the Zone of the node where the pod is scheduled", err)
 	}
 
-	deploymentDetailsMap["HOSTNAME"] = podHostname
 	deploymentDetailsMap["CLUSTERNAME"] = podCluster
 	deploymentDetailsMap["ZONE"] = podZone
 

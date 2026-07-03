@@ -95,9 +95,15 @@ spec:
           value: "1"
         {{- end }}
         readinessProbe:
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 3
           grpc:
             port: 7000
         livenessProbe:
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          failureThreshold: 5
           grpc:
             port: 7000
         resources:
