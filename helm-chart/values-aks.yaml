@@ -1,8 +1,0 @@
-frontend:
-  platform: azure
-
-imagePullSecrets:
-  - name: dockerhub-pull-secret
-
-loadGenerator:
-  create: false

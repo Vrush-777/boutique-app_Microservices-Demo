@@ -10,7 +10,10 @@ services:
   # AD SERVICE (Java) :9555
   # ─────────────────────────────────────────────
   adservice:
-    image: gcr.io/google-samples/microservices-demo/adservice:v0.3.9
+    build:
+      context: ./src/adservice
+      dockerfile: Dockerfile
+    image: adservice:latest
     container_name: adservice
     ports:
       - "9555:9555"
@@ -23,23 +26,27 @@ services:
   # ─────────────────────────────────────────────
   # REDIS (for Cart)
   # ─────────────────────────────────────────────
-  redis-cart:
-    image: redis:7-alpine
-    container_name: redis-cart
-    networks:
-      - microservices-net
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
+  # redis-cart:
+  #   image: redis:7-alpine
+  #   container_name: redis-cart
+  #   networks:
+  #     - microservices-net
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 5
 
   # ─────────────────────────────────────────────
   # CART SERVICE (C#) :7070
+  # Dockerfile lives inside src/cartservice/src/
   # ─────────────────────────────────────────────
   cartservice:
-    image: gcr.io/google-samples/microservices-demo/cartservice:v0.3.9
+    build:
+      context: ./src/cartservice/src
+      dockerfile: Dockerfile
+    image: cartservice:latest
     container_name: cartservice
     ports:
       - "7070:7070"
@@ -55,9 +62,13 @@ services:
 
   # ─────────────────────────────────────────────
   # CURRENCY SERVICE (Node.js) :7000
+  # Uses Dockerfile.fix to avoid pprof/Alpine build failure
   # ─────────────────────────────────────────────
   currencyservice:
-    image: gcr.io/google-samples/microservices-demo/currencyservice:v0.3.9
+    build:
+      context: ./src/currencyservice
+      dockerfile: Dockerfile.fix
+    image: currencyservice:latest
     container_name: currencyservice
     ports:
       - "7000:7000"
@@ -72,7 +83,10 @@ services:
   # EMAIL SERVICE (Python) :8080
   # ─────────────────────────────────────────────
   emailservice:
-    image: gcr.io/google-samples/microservices-demo/emailservice:v0.3.9
+    build:
+      context: ./src/emailservice
+      dockerfile: Dockerfile
+    image: emailservice:latest
     container_name: emailservice
     environment:
       - PORT=8080
@@ -85,7 +99,10 @@ services:
   # PRODUCT CATALOG SERVICE (Go) :3550
   # ─────────────────────────────────────────────
   productcatalogservice:
-    image: gcr.io/google-samples/microservices-demo/productcatalogservice:v0.3.9
+    build:
+      context: ./src/productcatalogservice
+      dockerfile: Dockerfile
+    image: productcatalogservice:latest
     container_name: productcatalogservice
     ports:
       - "3550:3550"
@@ -100,7 +117,10 @@ services:
   # PAYMENT SERVICE (Node.js) :50051
   # ─────────────────────────────────────────────
   paymentservice:
-    image: gcr.io/google-samples/microservices-demo/paymentservice:v0.3.9
+    build:
+      context: ./src/paymentservice
+      dockerfile: Dockerfile
+    image: paymentservice:latest
     container_name: paymentservice
     environment:
       - PORT=50051
@@ -110,30 +130,32 @@ services:
     restart: unless-stopped
 
   # ─────────────────────────────────────────────
-  # SHIPPING SERVICE (Go) :50050
+  # SHIPPING SERVICE (Go) :50051
   # ─────────────────────────────────────────────
   shippingservice:
-    image: gcr.io/google-samples/microservices-demo/shippingservice:v0.3.9
+    build:
+      context: ./src/shippingservice
+      dockerfile: Dockerfile
+    image: shippingservice:latest
     container_name: shippingservice
-    ports:
-      - "50050:50050"
     environment:
-      - PORT=50050
+      - PORT=50051
       - DISABLE_PROFILER=1
     networks:
       - microservices-net
     restart: unless-stopped
 
   # ─────────────────────────────────────────────
-  # RECOMMENDATION SERVICE (Python) :8081
+  # RECOMMENDATION SERVICE (Python) :8080
   # ─────────────────────────────────────────────
   recommendationservice:
-    image: gcr.io/google-samples/microservices-demo/recommendationservice:v0.3.9
+    build:
+      context: ./src/recommendationservice
+      dockerfile: Dockerfile
+    image: recommendationservice:latest
     container_name: recommendationservice
-    ports:
-      - "8081:8081"
     environment:
-      - PORT=8081
+      - PORT=8080
       - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
       - DISABLE_PROFILER=1
     depends_on:
@@ -146,17 +168,19 @@ services:
   # CHECKOUT SERVICE (Go) :5050
   # ─────────────────────────────────────────────
   checkoutservice:
-    image: gcr.io/google-samples/microservices-demo/checkoutservice:v0.3.9
+    build:
+      context: ./src/checkoutservice
+      dockerfile: Dockerfile
+    image: checkoutservice:latest
     container_name: checkoutservice
     environment:
       - PORT=5050
       - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
-      - SHIPPING_SERVICE_ADDR=shippingservice:50050
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051
       - PAYMENT_SERVICE_ADDR=paymentservice:50051
       - EMAIL_SERVICE_ADDR=emailservice:8080
       - CURRENCY_SERVICE_ADDR=currencyservice:7000
       - CART_SERVICE_ADDR=cartservice:7070
-      - DISABLE_PROFILER=1
     depends_on:
       - productcatalogservice
       - shippingservice
@@ -169,23 +193,43 @@ services:
     restart: unless-stopped
 
   # ─────────────────────────────────────────────
-  # FRONTEND (Go) :3000
+  # SHOPPING ASSISTANT SERVICE :8080
+  # ─────────────────────────────────────────────
+  shoppingassistantservice:
+    build:
+      context: ./src/shoppingassistantservice
+      dockerfile: Dockerfile
+    image: shoppingassistantservice:latest
+    container_name: shoppingassistantservice
+    environment:
+      - PORT=8080
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # FRONTEND (Go) :8080  ← open this in browser
   # ─────────────────────────────────────────────
   frontend:
-    image: gcr.io/google-samples/microservices-demo/frontend:v0.3.9
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+    image: frontend:latest
     container_name: frontend
     ports:
-      - "3000:8080"
+      - "8080:8080"
     environment:
       - PORT=8080
       - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
       - CURRENCY_SERVICE_ADDR=currencyservice:7000
       - CART_SERVICE_ADDR=cartservice:7070
-      - RECOMMENDATION_SERVICE_ADDR=recommendationservice:8081
-      - SHIPPING_SERVICE_ADDR=shippingservice:50050
+      - RECOMMENDATION_SERVICE_ADDR=recommendationservice:8080
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051
       - CHECKOUT_SERVICE_ADDR=checkoutservice:5050
       - AD_SERVICE_ADDR=adservice:9555
-      - DISABLE_PROFILER=1
+      - SHOPPING_ASSISTANT_SERVICE_ADDR=shoppingassistantservice:8080
+      - ENV_PLATFORM=local
+      - CYMBAL_BRANDING=false
     depends_on:
       - productcatalogservice
       - currencyservice
@@ -194,6 +238,7 @@ services:
       - shippingservice
       - checkoutservice
       - adservice
+      - shoppingassistantservice
     networks:
       - microservices-net
     restart: unless-stopped
@@ -202,7 +247,10 @@ services:
   # LOAD GENERATOR (Locust)
   # ─────────────────────────────────────────────
   loadgenerator:
-    image: gcr.io/google-samples/microservices-demo/loadgenerator:v0.3.9
+    build:
+      context: ./src/loadgenerator
+      dockerfile: Dockerfile
+    image: loadgenerator:latest
     container_name: loadgenerator
     environment:
       - FRONTEND_ADDR=frontend:8080
@@ -212,3 +260,4 @@ services:
     networks:
       - microservices-net
     restart: unless-stopped
+

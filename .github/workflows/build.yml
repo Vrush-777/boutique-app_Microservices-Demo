@@ -1,0 +1,144 @@
+# ==============================================================================
+# GITHUB ACTIONS CI PIPELINE - DAY 1
+# ==============================================================================
+# Builds Docker images and pushes to Azure Container Registry
+# ==============================================================================
+
+name: Build and Push to ACR
+
+# When to run this workflow
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/**'          # Only run if src/ changes
+      - 'docker/**'       # Only run if docker/ changes
+      - '.github/workflows/build.yml'
+
+env:
+  REGISTRY_NAME: acrpocboutique
+  REGISTRY_URL: acrpocboutique.azurecr.io
+
+# ==============================================================================
+# JOBS - What to do
+# ==============================================================================
+
+jobs:
+  # ===========================================================================
+  # JOB 1: Build and push images
+  # ===========================================================================
+  build:
+    runs-on: ubuntu-latest
+    
+    # =======================
+    # PERMISSIONS
+    # =======================
+    permissions:
+      contents: read
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Get short commit hash (for image tags)
+      - name: Get commit hash
+        id: vars
+        run: |
+          echo "commit_hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "branch_name=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
+
+      # Step 3: Login to Azure
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Step 4: Login to ACR
+      - name: Login to ACR
+        run: |
+          az acr login --name $REGISTRY_NAME
+
+      # Step 5: Build Frontend image
+      - name: Build Frontend
+        run: |
+          docker build \
+            -f docker/frontend.Dockerfile \
+            -t $REGISTRY_URL/frontend:latest \
+            -t $REGISTRY_URL/frontend:${{ steps.vars.outputs.commit_hash }} \
+            .
+
+      # Step 6: Push Frontend image
+      - name: Push Frontend
+        run: |
+          docker push $REGISTRY_URL/frontend:latest
+          docker push $REGISTRY_URL/frontend:${{ steps.vars.outputs.commit_hash }}
+
+      # Step 7: Build Cart Service
+      - name: Build Cart Service
+        run: |
+          docker build \
+            -f docker/cartservice.Dockerfile \
+            -t $REGISTRY_URL/cartservice:latest \
+            -t $REGISTRY_URL/cartservice:${{ steps.vars.outputs.commit_hash }} \
+            .
+
+      # Step 8: Push Cart Service
+      - name: Push Cart Service
+        run: |
+          docker push $REGISTRY_URL/cartservice:latest
+          docker push $REGISTRY_URL/cartservice:${{ steps.vars.outputs.commit_hash }}
+
+      # Step 9: Build Product Catalog Service
+      - name: Build Product Catalog Service
+        run: |
+          docker build \
+            -f docker/productcatalogservice.Dockerfile \
+            -t $REGISTRY_URL/productcatalogservice:latest \
+            -t $REGISTRY_URL/productcatalogservice:${{ steps.vars.outputs.commit_hash }} \
+            .
+
+      # Step 10: Push Product Catalog Service
+      - name: Push Product Catalog Service
+        run: |
+          docker push $REGISTRY_URL/productcatalogservice:latest
+          docker push $REGISTRY_URL/productcatalogservice:${{ steps.vars.outputs.commit_hash }}
+
+      # Step 11: Build Currency Service
+      - name: Build Currency Service
+        run: |
+          docker build \
+            -f docker/currencyservice.Dockerfile \
+            -t $REGISTRY_URL/currencyservice:latest \
+            -t $REGISTRY_URL/currencyservice:${{ steps.vars.outputs.commit_hash }} \
+            .
+
+      # Step 12: Push Currency Service
+      - name: Push Currency Service
+        run: |
+          docker push $REGISTRY_URL/currencyservice:latest
+          docker push $REGISTRY_URL/currencyservice:${{ steps.vars.outputs.commit_hash }}
+
+      # Step 13: Build Email Service
+      - name: Build Email Service
+        run: |
+          docker build \
+            -f docker/emailservice.Dockerfile \
+            -t $REGISTRY_URL/emailservice:latest \
+            -t $REGISTRY_URL/emailservice:${{ steps.vars.outputs.commit_hash }} \
+            .
+
+      # Step 14: Push Email Service
+      - name: Push Email Service
+        run: |
+          docker push $REGISTRY_URL/emailservice:latest
+          docker push $REGISTRY_URL/emailservice:${{ steps.vars.outputs.commit_hash }}
+
+      # Step 15: Verify images in ACR
+      - name: Verify images pushed
+        run: |
+          az acr repository list --name $REGISTRY_NAME --output table
+
+      # Step 16: Logout
+      - name: Logout from Azure
+        run: az logout

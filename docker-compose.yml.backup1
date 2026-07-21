@@ -1,0 +1,142 @@
+services:
+  # ============= DATABASES & CACHES =============
+  redis-cart:
+    image: redis:7-alpine
+    container_name: redis-cart
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # ============= MICROSERVICES =============
+  
+  adservice:
+    image: gcr.io/google-samples/microservices-demo/adservice:v0.3.9
+    container_name: adservice
+    ports:
+      - "9555:9555"
+    environment:
+      - PORT=9555
+    restart: unless-stopped
+
+  cartservice:
+    image: gcr.io/google-samples/microservices-demo/cartservice:v0.3.9
+    container_name: cartservice
+    ports:
+      - "7070:7070"
+    environment:
+      - REDIS_ADDR=redis-cart:6379
+      - PORT=7070
+    depends_on:
+      - redis-cart
+    restart: unless-stopped
+
+  checkoutservice:
+    image: gcr.io/google-samples/microservices-demo/checkoutservice:v0.3.9
+    container_name: checkoutservice
+    ports:
+      - "5050:5050"
+    environment:
+      - PORT=5050
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - SHIPPING_SERVICE_ADDR=shippingservice:50050
+      - PAYMENT_SERVICE_ADDR=paymentservice:50051
+      - EMAIL_SERVICE_ADDR=emailservice:8080
+      - CART_SERVICE_ADDR=cartservice:7070
+    depends_on:
+      - cartservice
+      - productcatalogservice
+      - shippingservice
+      - paymentservice
+      - emailservice
+    restart: unless-stopped
+
+  currencyservice:
+    image: gcr.io/google-samples/microservices-demo/currencyservice:v0.3.9
+    container_name: currencyservice
+    ports:
+      - "7000:7000"
+    environment:
+      - PORT=7000
+    restart: unless-stopped
+
+  emailservice:
+    image: gcr.io/google-samples/microservices-demo/emailservice:v0.3.9
+    container_name: emailservice
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+    restart: unless-stopped
+
+  frontend:
+    image: gcr.io/google-samples/microservices-demo/frontend:v0.3.9
+    container_name: frontend
+    ports:
+      - "3000:8080"
+    environment:
+      - PORT=80
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000
+      - CART_SERVICE_ADDR=cartservice:7070
+      - RECOMMENDATION_SERVICE_ADDR=recommendationservice:8081
+      - SHIPPING_SERVICE_ADDR=shippingservice:50050
+      - CHECKOUT_SERVICE_ADDR=checkoutservice:5050
+      - AD_SERVICE_ADDR=adservice:9555
+    depends_on:
+      - productcatalogservice
+      - currencyservice
+      - cartservice
+      - recommendationservice
+      - shippingservice
+      - checkoutservice
+      - adservice
+    restart: unless-stopped
+
+  paymentservice:
+    image: gcr.io/google-samples/microservices-demo/paymentservice:v0.3.9
+    container_name: paymentservice
+    ports:
+      - "50051:50051"
+    environment:
+      - PORT=50051
+    restart: unless-stopped
+
+  productcatalogservice:
+    image: gcr.io/google-samples/microservices-demo/productcatalogservice:v0.3.9
+    container_name: productcatalogservice
+    ports:
+      - "3550:3550"
+    environment:
+      - PORT=3550
+    restart: unless-stopped
+
+  recommendationservice:
+    image: gcr.io/google-samples/microservices-demo/recommendationservice:v0.3.9
+    container_name: recommendationservice
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+    depends_on:
+      - productcatalogservice
+    restart: unless-stopped
+
+  shippingservice:
+    image: gcr.io/google-samples/microservices-demo/shippingservice:v0.3.9
+    container_name: shippingservice
+    ports:
+      - "50050:50050"
+    environment:
+      - PORT=50050
+    restart: unless-stopped
+
+  loadgenerator:
+    image: gcr.io/google-samples/microservices-demo/loadgenerator:v0.3.9
+    container_name: loadgenerator
+    environment:
+      - FRONTEND_ADDR=frontend:80
+      - USERS=10
+    depends_on:
+      - frontend
+    restart: unless-stopped
