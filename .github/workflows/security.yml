@@ -50,6 +50,7 @@ jobs:
   trivy-docker:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         service:
           - frontend
@@ -70,7 +71,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build Docker image for ${{ matrix.service }}
+      - name: Build Docker image
         run: |
             docker build \
             -t ${{ matrix.service }}:scan \
