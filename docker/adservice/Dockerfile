@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY src/adservice .
 
-RUN ./gradlew build --no-daemon
+RUN chmod +x gradlew && ./gradlew build --no-daemon
 
 
 FROM eclipse-temurin:21-jre
