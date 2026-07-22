@@ -1,0 +1,79 @@
+# ==============================================================================
+# FRONTEND DEPLOYMENT
+# ==============================================================================
+# Kubernetes deployment for frontend service
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: boutique
+  labels:
+    app: frontend
+spec:
+  replicas: 2  # Run 2 instances
+
+  selector:
+    matchLabels:
+      app: frontend
+
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      # Container specification
+      containers:
+      - name: frontend
+        image: acrpocboutique.azurecr.io/frontend:latest
+        imagePullPolicy: Always
+        
+        # Port to expose
+        ports:
+        - containerPort: 8080
+          name: http
+        
+        # Resource requests and limits
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        
+        # Health check
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+# ==============================================================================
+# SERVICE
+# ==============================================================================
+# Exposes the deployment to other services
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: boutique
+spec:
+  type: LoadBalancer
+  selector:
+    app: frontend
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP

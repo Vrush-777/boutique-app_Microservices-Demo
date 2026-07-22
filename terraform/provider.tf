@@ -1,8 +1,3 @@
-# ==============================================================================
-# TERRAFORM CONFIGURATION
-# ==============================================================================
-# Defines which Terraform version and providers we need
-# ==============================================================================
 
 terraform {
   # required_version: Which Terraform versions can run this code
@@ -10,50 +5,18 @@ terraform {
   # This ensures consistency across team members
   required_version = ">= 1.3.0"
 
-  # ==============================================================================
-  # REQUIRED PROVIDERS
-  # ==============================================================================
-  # Tells Terraform which providers we use and where to download them from
-  # ==============================================================================
-
+  
   required_providers {
-    # ==============================================================================
-    # AZURERM PROVIDER
-    # ==============================================================================
-    # For managing all Azure resources
-    # Source: Official HashiCorp provider on registry.terraform.io
-    # ==============================================================================
     azurerm = {
-      # source: Where to download the provider from
-      # "hashicorp/azurerm" = Official HashiCorp Azure provider
       source = "hashicorp/azurerm"
-
-      # version: Which version(s) of the provider to use
-      # "~> 3.0" means:
-      #   - 3.0 or newer (>= 3.0)
-      #   - But less than 4.0 (< 4.0)
-      #   - This gives us: 3.0, 3.1, 3.2, 3.85.0, etc.
-      #   - But NOT 4.0 (major version change might break things)
-      # This balances between getting bug fixes and not breaking changes
       version = "~> 3.0"
     }
 
-    # ==============================================================================
-    # KUBERNETES PROVIDER (Optional, for future use with ArgoCD)
-    # ==============================================================================
-    # We'll use this in Module 6 (GitOps/ArgoCD)
-    # Allows Terraform to manage Kubernetes resources
-    # ==============================================================================
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 2.0"
     }
 
-    # ==============================================================================
-    # HELM PROVIDER (Optional, for Helm charts)
-    # ==============================================================================
-    # We'll use this to install ArgoCD via Helm in Module 6
-    # ==============================================================================
     helm = {
       source  = "hashicorp/helm"
       version = "~> 2.0"
@@ -101,11 +64,6 @@ terraform {
   # Comment out above, add backend block if you want remote state
 }
 
-# ==============================================================================
-# AZURERM PROVIDER CONFIGURATION
-# ==============================================================================
-# Configures how Terraform connects to Azure
-# ==============================================================================
 
 provider "azurerm" {
   # features: Enable/disable Azure-specific features

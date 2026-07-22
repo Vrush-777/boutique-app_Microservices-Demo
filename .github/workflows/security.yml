@@ -1,0 +1,129 @@
+name: Security Scans
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  trivy-fs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+
+      - name: Upload Trivy filesystem results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+
+  trivy-docker:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - frontend
+          - cartservice
+          - productcatalogservice
+          - currencyservice
+          - paymentservice
+          - shippingservice
+          - emailservice
+          - recommendationservice
+          - adservice
+          - checkoutservice
+          - loadgenerator
+          - shoppingassistantservice
+          - redis-cart
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image for ${{ matrix.service }}
+        run: |
+          docker build -t ${{ matrix.service }}:scan ./docker/${{ matrix.service }}
+
+      - name: Run Trivy on ${{ matrix.service }}
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ matrix.service }}:scan'
+          format: 'sarif'
+          output: '${{ matrix.service }}-trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: '${{ matrix.service }}-trivy-results.sarif'
+
+  owasp-dependency-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: "boutique-app_Microservices-Demo"
+          path: '.'
+          format: 'SARIF'
+          args: >
+            --enableExperimental
+
+      - name: Upload OWASP results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'dependency-check-report.sarif'
+
+  sonarqube:
+    runs-on: ubuntu-latest
+
+    steps:
+        - name: Checkout repository
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+
+        - name: SonarQube Scan
+          uses: SonarSource/sonarqube-scan-action@v6
+          env:
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+            SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          with:
+            args: >
+             -Dsonar.projectKey=Vrush-777_boutique-app_Microservices-Demo
+             -Dsonar.organization=vrush-777
+
+        - name: Quality Gate
+          uses: SonarSource/sonarqube-quality-gate-action@v1
+          timeout-minutes: 5
+          env:
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+            SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
