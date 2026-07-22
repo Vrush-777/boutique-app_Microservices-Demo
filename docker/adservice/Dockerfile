@@ -4,15 +4,16 @@ WORKDIR /app
 
 COPY src/adservice .
 
-RUN chmod +x gradlew && ./gradlew build --no-daemon
-
+RUN chmod +x gradlew
+RUN ./gradlew downloadRepos
+RUN ./gradlew installDist
 
 FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-COPY --from=builder /app/build/libs/*.jar app.jar
+COPY --from=builder /app .
 
 EXPOSE 9555
 
-ENTRYPOINT ["java","-jar","app.jar"]
+ENTRYPOINT ["/app/build/install/hipstershop/bin/AdService"]
