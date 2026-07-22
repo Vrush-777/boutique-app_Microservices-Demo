@@ -97,7 +97,7 @@ jobs:
       - name: Run OWASP Dependency-Check
         uses: dependency-check/Dependency-Check_Action@main
         with:
-          project: "boutique-app_Microservices-Demo"
+          project: "boutique-app"
           path: '.'
           format: 'SARIF'
           out: 'reports'
