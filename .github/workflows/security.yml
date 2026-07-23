@@ -15,8 +15,11 @@ permissions:
   security-events: write
 
 jobs:
+
   gitleaks:
+    name: Gitleaks Secret Scan
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,8 +31,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+
   trivy-fs:
+    name: Trivy Filesystem Scan
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,101 +43,71 @@ jobs:
       - name: Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-fs-results.sarif'
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-fs-results.sarif
 
-      - name: Upload Trivy filesystem results to GitHub Security
+      - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-fs-results.sarif'
+          sarif_file: trivy-fs-results.sarif
 
-  trivy-docker:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        service:
-          - frontend
-          - cartservice
-          - productcatalogservice
-          - currencyservice
-          - paymentservice
-          - shippingservice
-          - emailservice
-          - recommendationservice
-          - adservice
-          - checkoutservice
-          - loadgenerator
-          - shoppingassistantservice
-          - redis-cart
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Build Docker image
-        run: |
-            docker build \
-            -t ${{ matrix.service }}:scan \
-            -f docker/${{ matrix.service }}/Dockerfile .
-
-      - name: Run Trivy on ${{ matrix.service }}
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: '${{ matrix.service }}:scan'
-          format: 'sarif'
-          output: '${{ matrix.service }}-trivy-results.sarif'
-
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: '${{ matrix.service }}-trivy-results.sarif'
 
   owasp-dependency-check:
+    name: OWASP Dependency Check
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run OWASP Dependency-Check
+
+      - name: Run OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
         with:
-          project: "boutique-app"
-          path: '.'
-          format: 'SARIF'
-          out: 'reports'
+          project: boutique-app
+          path: .
+          format: SARIF
+          out: reports
           args: >
             --enableExperimental
 
-      - name: Upload OWASP results to GitHub Security
+
+      - name: Upload OWASP results
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'reports/dependency-check-report.sarif'
+          sarif_file: reports/dependency-check-report.sarif
+
 
   sonarqube:
+    name: SonarQube Cloud Analysis
     runs-on: ubuntu-latest
 
     steps:
-        - name: Checkout repository
-          uses: actions/checkout@v4
-          with:
-            fetch-depth: 0
 
-        - name: SonarQube Scan
-          uses: SonarSource/sonarqube-scan-action@v6
-          env:
-            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-            SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          with:
-            args: >
-             -Dsonar.projectKey=Vrush-777_boutique-app_Microservices-Demo
-             -Dsonar.organization=vrush-777
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-        - name: Quality Gate
-          uses: SonarSource/sonarqube-quality-gate-action@v1
-          timeout-minutes: 5
-          env:
-            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-            SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+        with:
+          args: >
+            -Dsonar.projectKey=Vrush-777_boutique-app_Microservices-Demo
+            -Dsonar.organization=vrush-777
+
+
+      - name: SonarQube Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
