@@ -16,10 +16,10 @@
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.100-noble@sha256:c7445f141c04f1a6b454181bd098dcfa606c61ba0bd213d0a702489e5bd4cd71 AS builder
 ARG TARGETARCH
 WORKDIR /app
-COPY cartservice.csproj .
+COPY src/cartservice.csproj ./
 RUN dotnet restore cartservice.csproj \
     -a $TARGETARCH
-COPY . .
+COPY src/. ./
 RUN dotnet publish cartservice.csproj \
     -p:PublishSingleFile=true \
     -a $TARGETARCH \
