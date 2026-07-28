@@ -1,0 +1,11 @@
+namespace: boutique
+
+image:
+  repository: vrushacr777.azurecr.io
+  tag: latest
+
+replicas:
+  frontend: 1
+  cartservice: 1
+  redis: 1
+  productcatalogservice: 1
