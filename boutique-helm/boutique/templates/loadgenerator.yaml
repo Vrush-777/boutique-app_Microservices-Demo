@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgenerator
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: loadgenerator
+
+spec:
+  replicas: {{ .Values.replicas.loadgenerator }}
+
+  selector:
+    matchLabels:
+      app: loadgenerator
+
+  template:
+    metadata:
+      labels:
+        app: loadgenerator
+
+    spec:
+      containers:
+        - name: loadgenerator
+
+          image: "{{ .Values.image.registry }}/loadgenerator:{{ .Values.image.tag }}"
+          imagePullPolicy: Always
+
+          env:
+            - name: FRONTEND_ADDR
+              value: "frontend:8080"
+
+            - name: USERS
+              value: "10"
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+
+            limits:
+              cpu: 200m
+              memory: 256Mi

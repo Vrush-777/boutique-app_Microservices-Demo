@@ -1,0 +1,100 @@
+name: Terraform Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "terraform/**"
+
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+
+  terraform:
+
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: terraform/environments/dev
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.0
+
+      - name: Terraform Version
+        run: terraform version
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Format
+        run: terraform fmt -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Show Terraform Plan
+        run: terraform show tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Wait for AKS to finish provisioning
+        run: |
+          az aks wait \
+            --resource-group rg-devsecops-poc \
+            --name aks-boutique-dev \
+            --created
+
+      - name: Verify AGIC Add-on
+        run: |
+          az aks show \
+            --resource-group rg-devsecops-poc \
+            --name aks-boutique-dev \
+            --query ingressProfile
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Kubectl Version
+        run: kubectl version --client
+
+      - name: Get AKS Credentials
+        run: |
+          az aks get-credentials \
+            --resource-group rg-devsecops-poc \
+            --name aks-boutique-dev \
+            --overwrite-existing
+
+      - name: Verify Cluster
+        run: |
+          kubectl get nodes
+    
+      - name: Dump AKS Information
+        run: |
+            az aks show \
+            --resource-group rg-devsecops-poc \
+            --name aks-boutique-dev \
+            --output json

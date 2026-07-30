@@ -1,11 +1,60 @@
 namespace: boutique
 
 image:
-  repository: vrushacr777.azurecr.io
+  registry: vrushacr777.azurecr.io
   tag: latest
 
 replicas:
   frontend: 1
   cartservice: 1
-  redis: 1
   productcatalogservice: 1
+  currencyservice: 1
+  paymentservice: 1
+  shippingservice: 1
+  checkoutservice: 1
+  recommendationservice: 1
+  emailservice: 1
+  adservice: 1
+  loadgenerator: 1
+  redisCart: 1
+
+# Disable Google AlloyDB dependent service
+shoppingassistantservice:
+  enabled: false
+
+services:
+  frontend:
+    port: 8080
+
+  cartservice:
+    port: 7070
+
+  productcatalogservice:
+    port: 3550
+
+  currencyservice:
+    port: 7000
+
+  paymentservice:
+    port: 50051
+
+  shippingservice:
+    port: 50050
+
+  checkoutservice:
+    port: 5050
+
+  recommendationservice:
+    port: 8081
+
+  emailservice:
+    port: 8080
+
+  adservice:
+    port: 9555
+
+  redis:
+    port: 6379
+
+redis:
+  tag: 7-alpine

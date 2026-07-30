@@ -1,5 +1,5 @@
-variable "acr_name" {
-  description = "Azure Container Registry Name"
+variable "identity_name" {
+  description = "Managed Identity Name"
   type        = string
 }
 
@@ -13,19 +13,20 @@ variable "location" {
   type        = string
 }
 
-variable "sku" {
-  description = "ACR SKU"
+variable "acr_id" {
+  description = "Azure Container Registry ID"
   type        = string
-  default     = "Basic"
-}
-
-variable "admin_enabled" {
-  description = "Enable Admin User"
-  type        = bool
-  default     = true
 }
 
 variable "tags" {
   type    = map(string)
   default = {}
+}
+
+variable "resource_group_id" {
+  type = string
+}
+
+variable "appgw_subnet_id" {
+  type = string
 }

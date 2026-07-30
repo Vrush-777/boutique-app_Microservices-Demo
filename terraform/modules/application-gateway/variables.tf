@@ -1,0 +1,25 @@
+variable "application_gateway_name" {
+  type = string
+}
+
+variable "resource_group_name" {
+  type = string
+}
+
+variable "location" {
+  type = string
+}
+
+variable "subnet_id" {
+  type = string
+}
+
+variable "capacity" {
+  type    = number
+  default = 2
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
