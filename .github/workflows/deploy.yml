@@ -1,0 +1,66 @@
+name: Deploy Application to AKS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "boutique-helm/**"
+      - ".github/workflows/deploy.yml"
+
+  workflow_dispatch:
+
+permissions:
+
+  id-token: write
+  contents: read
+
+jobs:
+
+  deploy:
+
+    name: Helm Deploy to AKS
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v2
+
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v4
+
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+
+    - name: Get AKS Credentials
+      run: |
+        az aks get-credentials \
+        --resource-group rg-devsecops-poc \
+        --name aks-boutique-dev \
+        --overwrite-existing
+
+    - name: Verify AKS
+      run: |
+        kubectl get nodes
+
+    - name: Deploy Helm Chart
+      run: |
+        helm upgrade --install boutique \
+        ./boutique-helm/boutique \
+        --namespace boutique \
+        --create-namespace
+
+    - name: Verify Deployment
+      run: |
+        kubectl get pods -n boutique
+        kubectl get ingress -n boutique
