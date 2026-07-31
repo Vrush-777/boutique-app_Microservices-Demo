@@ -30,6 +30,9 @@ terraform.tfstate.*    # State backups
 terraform.tfvars       # Your variable values (passwords, IDs, etc.)
 terraform.tfvars.json  # JSON version
 *.tfvars              # Any .tfvars files
+
+!terraform/environments/dev/dev.tfvars
+
 *.tfvars.json
 
 # ==============================================================================
