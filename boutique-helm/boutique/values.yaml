@@ -57,4 +57,4 @@ services:
     port: 6379
 
 redis:
-  tag: 7-alpine
+  tag: latest
