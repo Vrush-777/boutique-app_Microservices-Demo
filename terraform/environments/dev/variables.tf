@@ -84,7 +84,7 @@ variable "max_count" {
   type = number
 }
 
-variable "identity_name" {
-  description = "User Assigned Managed Identity Name"
-  type        = string
-}
+# variable "identity_name" {
+#   description = "User Assigned Managed Identity Name"
+#   type        = string
+# }

@@ -53,32 +53,32 @@ module "acr" {
   }
 }
 
-module "managed_identity" {
+# module "managed_identity" {
 
-  source = "../../modules/managed-identity"
+#   source = "../../modules/managed-identity"
 
-  identity_name = var.identity_name
+#   identity_name = var.identity_name
 
-  resource_group_name = module.resource_group.resource_group_name
+#   resource_group_name = module.resource_group.resource_group_name
 
-  location = module.resource_group.location
-
-
-  acr_id = module.acr.acr_id
+#   location = module.resource_group.location
 
 
-  resource_group_id = module.resource_group.resource_group_id
+#   acr_id = module.acr.acr_id
 
 
-  appgw_subnet_id = module.network.appgw_subnet_id
+#   resource_group_id = module.resource_group.resource_group_id
 
 
-  tags = {
-    Environment = "dev"
-    Project     = "online-boutique"
-    ManagedBy   = "Terraform"
-  }
-}
+#   appgw_subnet_id = module.network.appgw_subnet_id
+
+
+#   tags = {
+#     Environment = "dev"
+#     Project     = "online-boutique"
+#     ManagedBy   = "Terraform"
+#   }
+# }
 
 module "application_gateway" {
 
@@ -130,8 +130,8 @@ module "aks" {
   application_gateway_id = module.application_gateway.application_gateway_id
 
   depends_on = [
-  module.application_gateway
-]
+    module.application_gateway
+  ]
 
   tags = {
     Environment = "dev"
