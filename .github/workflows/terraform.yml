@@ -28,6 +28,13 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Debug GitHub Context
+        run: |
+            echo "Repository: ${{ github.repository }}"
+            echo "Repository ID: ${{ github.repository_id }}"
+            echo "Repository Owner ID: ${{ github.repository_owner_id }}"
+            echo "Ref: ${{ github.ref }}"
+
       - name: Azure Login
         uses: azure/login@v2
         with:
