@@ -91,6 +91,7 @@ module "application_gateway" {
 
   subnet_id = module.network.appgw_subnet_id
 
+
   tags = {
     Environment = "dev"
     Project     = "online-boutique"

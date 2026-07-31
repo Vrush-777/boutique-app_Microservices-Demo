@@ -37,4 +37,4 @@ node_count = 2
 
 min_count = 2
 
-max_count = 4
+max_count = 5

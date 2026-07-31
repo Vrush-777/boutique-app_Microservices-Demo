@@ -28,3 +28,7 @@ output "kube_config" {
 output "cluster_identity_principal_id" {
   value = azurerm_kubernetes_cluster.this.identity[0].principal_id
 }
+
+output "agic_identity_object_id" {
+  value = azurerm_kubernetes_cluster.this.ingress_application_gateway[0].ingress_application_gateway_identity[0].object_id
+}
