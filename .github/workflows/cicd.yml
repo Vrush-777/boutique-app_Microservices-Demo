@@ -1,0 +1,270 @@
+name: Azure AKS CI/CD Pipeline
+
+on:
+
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+
+permissions:
+
+  id-token: write
+  contents: read
+  security-events: write
+
+
+# ============================
+# 1. TERRAFORM
+# ============================
+
+jobs:
+
+  terraform:
+
+    name: Terraform Infrastructure
+
+    runs-on: ubuntu-latest
+
+
+    defaults:
+
+      run:
+        working-directory: terraform/environments/dev
+
+
+    steps:
+
+
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+
+    - name: Azure Login
+      uses: azure/login@v2
+
+      with:
+
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+      with:
+
+        terraform_version: 1.14.0
+
+
+    - name: Terraform Init
+      run: terraform init
+
+
+    - name: Terraform Format
+      run: terraform fmt -recursive
+
+
+    - name: Terraform Validate
+      run: terraform validate
+
+
+    - name: Terraform Plan
+      run: terraform plan -var-file=dev.tfvars -out=tfplan
+
+
+    - name: Terraform Apply
+      run: terraform apply -auto-approve tfplan
+
+
+
+# ============================
+# 2. SECURITY
+# ============================
+
+
+  security:
+
+
+    name: Security Scans
+
+    needs: terraform
+
+    runs-on: ubuntu-latest
+
+
+
+    steps:
+
+
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+
+
+    # Secret Scan
+
+    - name: Gitleaks Scan
+
+      uses: gitleaks/gitleaks-action@v2
+
+      env:
+
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+
+    # Filesystem Scan
+
+    - name: Trivy Filesystem Scan
+
+      uses: aquasecurity/trivy-action@master
+
+      with:
+
+        scan-type: fs
+
+        scan-ref: .
+
+        severity: HIGH,CRITICAL
+
+        exit-code: 0
+
+
+
+    # Dependency Scan
+
+    - name: OWASP Dependency Check
+
+      uses: dependency-check/Dependency-Check_Action@main
+
+      with:
+
+        project: boutique-app
+
+        path: .
+
+        format: HTML
+
+        out: reports
+
+
+
+    # SonarQube
+
+    - name: SonarQube Scan
+
+      uses: SonarSource/sonarqube-scan-action@v6
+
+      env:
+
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+
+
+# ============================
+# 3. BUILD AND PUSH
+# ============================
+
+
+  build:
+
+
+    name: Build Push Images
+
+    needs: security
+
+    runs-on: ubuntu-latest
+
+
+
+    strategy:
+
+      fail-fast: false
+
+      matrix:
+
+        service:
+
+          - frontend
+          - cartservice
+          - productcatalogservice
+          - currencyservice
+          - paymentservice
+          - shippingservice
+          - emailservice
+          - recommendationservice
+          - adservice
+          - checkoutservice
+          - loadgenerator
+          - shoppingassistantservice
+
+
+
+    steps:
+
+
+    - name: Checkout Code
+
+      uses: actions/checkout@v4
+
+
+
+    - name: Login ACR
+
+      uses: docker/login-action@v3
+
+      with:
+
+        registry: ${{ secrets.ACR_LOGIN_SERVER }}
+
+        username: ${{ secrets.ACR_USERNAME }}
+
+        password: ${{ secrets.ACR_PASSWORD }}
+
+
+
+    - name: Build Image
+
+      uses: docker/build-push-action@v5
+
+      with:
+
+        context: src/${{ matrix.service }}
+
+        file: docker/${{ matrix.service }}/Dockerfile
+
+        push: false
+
+        load: true
+
+        tags:
+
+          ${{ matrix.service }}:latest
+
+
+
+    - name: Tag Image
+
+      run: |
+
+        docker tag \
+
+        ${{ matrix.service }}:latest \
+
+        ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
+
+
+
+    - name: Push Image
+
+      run: |
+
+        docker push \
+
+        ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
