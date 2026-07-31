@@ -1,4 +1,4 @@
-subscription_id = "96f9f983-8879-4a68-b98c-fa5a165f137b"
+subscription_id     = "96f9f983-8879-4a68-b98c-fa5a165f137b"
 resource_group_name = "rg-devsecops-poc"
 
 location = "Central India"

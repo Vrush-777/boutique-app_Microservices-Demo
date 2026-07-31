@@ -91,8 +91,6 @@ module "application_gateway" {
 
   subnet_id = module.network.appgw_subnet_id
 
-  capacity = var.application_gateway_capacity
-
   tags = {
     Environment = "dev"
     Project     = "online-boutique"

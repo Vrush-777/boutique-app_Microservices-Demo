@@ -16,7 +16,6 @@
 *.pyc
 *.swp
 *.tfstate*
-*.tfvars
 *~
 # values-azure-redis.yaml is safe to commit — connectionString is empty here;
 # the real key is injected at deploy time via --set from a CI secret.
@@ -30,3 +29,5 @@ release/wi-kubernetes-manifests.yaml
 vendor/
 *.pem
 .terraform
+# Allow Terraform dev variables for POC
+!terraform/environments/dev/dev.tfvars

@@ -17,9 +17,13 @@ resource "azurerm_application_gateway" "this" {
   resource_group_name = var.resource_group_name
 
   sku {
-    name     = "Standard_v2"
-    tier     = "Standard_v2"
-    capacity = var.capacity
+    name = "Standard_v2"
+    tier = "Standard_v2"
+  }
+
+  autoscale_configuration {
+    min_capacity = 1
+    max_capacity = 3
   }
 
   gateway_ip_configuration {
@@ -66,4 +70,14 @@ resource "azurerm_application_gateway" "this" {
   }
 
   tags = var.tags
+
+  lifecycle {
+    ignore_changes = [
+      backend_address_pool,
+      backend_http_settings,
+      http_listener,
+      request_routing_rule,
+      probe
+    ]
+  }
 }

@@ -10,34 +10,34 @@ resource "azurerm_kubernetes_cluster" "this" {
 
   sku_tier = "Free"
 
-ingress_application_gateway {
-  gateway_id = var.application_gateway_id
-}
+  ingress_application_gateway {
+    gateway_id = var.application_gateway_id
+  }
 
 
   default_node_pool {
 
-    name                = "system"
+    name = "system"
 
-    node_count          = var.node_count
+    node_count = var.node_count
 
-    vm_size             = var.vm_size
+    vm_size = var.vm_size
 
-    vnet_subnet_id      = var.aks_subnet_id
+    vnet_subnet_id = var.aks_subnet_id
 
-    os_disk_size_gb     = 50
+    os_disk_size_gb = 50
 
-    type                = "VirtualMachineScaleSets"
+    type = "VirtualMachineScaleSets"
 
     auto_scaling_enabled = true
 
-    min_count           = var.min_count
+    min_count = var.min_count
 
-    max_count           = var.max_count
+    max_count = var.max_count
   }
 
-identity {
-  type = "SystemAssigned"
+  identity {
+    type = "SystemAssigned"
   }
 
 
@@ -56,7 +56,7 @@ identity {
 
   role_based_access_control_enabled = true
 
-  oidc_issuer_enabled       = true
+  oidc_issuer_enabled = true
 
   workload_identity_enabled = true
 
@@ -66,7 +66,7 @@ identity {
 
 resource "azurerm_role_assignment" "acr_pull" {
 
-  scope                = var.acr_id
+  scope = var.acr_id
 
   role_definition_name = "AcrPull"
 

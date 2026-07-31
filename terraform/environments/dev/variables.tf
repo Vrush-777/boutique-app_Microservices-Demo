@@ -52,10 +52,6 @@ variable "application_gateway_name" {
   type = string
 }
 
-variable "application_gateway_capacity" {
-  type    = number
-  default = 2
-}
 
 variable "cluster_name" {
   type = string

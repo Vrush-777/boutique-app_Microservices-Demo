@@ -27,13 +27,12 @@ terraform.tfstate.*    # State backups
 # ==============================================================================
 # Contains secrets and credentials
 
-terraform.tfvars       # Your variable values (passwords, IDs, etc.)
-terraform.tfvars.json  # JSON version
-*.tfvars              # Any .tfvars files
+terraform.tfvars
+terraform.tfvars.json
 
+
+# Allow dev environment tfvars for POC
 !terraform/environments/dev/dev.tfvars
-
-*.tfvars.json
 
 # ==============================================================================
 # TEMPORARY TERRAFORM FILES
