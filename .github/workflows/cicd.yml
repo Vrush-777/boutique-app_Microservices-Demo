@@ -247,24 +247,10 @@ jobs:
 
           ${{ matrix.service }}:latest
 
-
-
     - name: Tag Image
-
       run: |
-
-        docker tag \
-
-        ${{ matrix.service }}:latest \
-
-        ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
-
-
+        docker tag ${{ matrix.service }}:latest ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
 
     - name: Push Image
-
       run: |
-
-        docker push \
-
-        ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
+        docker push ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
