@@ -254,3 +254,53 @@ jobs:
     - name: Push Image
       run: |
         docker push ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
+
+# ==================================
+# 4. PUSH REDIS IMAGE
+# ==================================
+
+  redis-image:
+
+    name: Push Redis Image
+
+    needs: build
+
+    runs-on: ubuntu-latest
+
+
+    steps:
+
+    - name: Login ACR
+
+      uses: docker/login-action@v3
+
+      with:
+
+        registry: ${{ secrets.ACR_LOGIN_SERVER }}
+
+        username: ${{ secrets.ACR_USERNAME }}
+
+        password: ${{ secrets.ACR_PASSWORD }}
+
+
+    - name: Pull Redis Image
+
+      run: |
+
+        docker pull redis:7-alpine
+
+
+    - name: Tag Redis Image
+
+      run: |
+
+        docker tag redis:7-alpine \
+        ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:latest
+
+
+    - name: Push Redis Image
+
+      run: |
+
+        docker push \
+        ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:latest
