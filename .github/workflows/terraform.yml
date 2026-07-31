@@ -60,17 +60,13 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan
-        env:
-          TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: terraform plan -var-file=dev.tfvars -out=tfplan
 
       - name: Show Terraform Plan
         run: terraform show tfplan
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
-        env:
-          TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Wait for AKS to finish provisioning
         run: |
