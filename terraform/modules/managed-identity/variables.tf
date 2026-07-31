@@ -30,3 +30,8 @@ variable "resource_group_id" {
 variable "appgw_subnet_id" {
   type = string
 }
+
+variable "application_gateway_id" {
+  description = "Application Gateway ID"
+  type        = string
+}

@@ -100,15 +100,6 @@ module "application_gateway" {
   }
 }
 
-resource "azurerm_role_assignment" "agic_appgw_contributor" {
-
-  scope = module.application_gateway.application_gateway_id
-
-  role_definition_name = "Contributor"
-
-  principal_id = module.managed_identity.principal_id
-
-}
 
 module "aks" {
 
