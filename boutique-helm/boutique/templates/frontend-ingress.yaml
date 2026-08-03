@@ -3,22 +3,18 @@ kind: Ingress
 
 metadata:
   name: frontend-ingress
-  namespace: boutique
-
   annotations:
     kubernetes.io/ingress.class: azure/application-gateway
 
 spec:
-
-  ingressClassName: azure-application-gateway
   rules:
-  - host: app.example.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: frontend
-            port:
-              number: 80
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
