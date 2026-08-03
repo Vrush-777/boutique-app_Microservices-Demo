@@ -139,15 +139,6 @@ module "aks" {
   }
 }
 
-resource "time_sleep" "wait_for_agic_identity" {
-  depends_on = [
-    azurerm_kubernetes_cluster.this
-  ]
-
-  create_duration = "90s"
-}
-
-
 resource "azurerm_role_assignment" "agic_reader" {
   scope = module.resource_group.resource_group_id
   role_definition_name = "Reader"

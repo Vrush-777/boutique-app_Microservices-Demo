@@ -30,16 +30,9 @@ output "cluster_identity_principal_id" {
 }
 
 output "agic_identity_object_id" {
-  depends_on = [
-    time_sleep.wait_for_agic_identity
-  ]
-
   value = azurerm_kubernetes_cluster.this.ingress_application_gateway[0].ingress_application_gateway_identity[0].object_id
 }
 
 output "agic_identity_client_id" {
-  depends_on = [
-    time_sleep.wait_for_agic_identity
-  ]
   value = azurerm_kubernetes_cluster.this.ingress_application_gateway[0].ingress_application_gateway_identity[0].client_id
 }
