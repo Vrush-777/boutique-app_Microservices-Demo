@@ -129,7 +129,8 @@ module "aks" {
   application_gateway_id = module.application_gateway.application_gateway_id
 
   depends_on = [
-    module.application_gateway
+    module.application_gateway,
+    module.network
   ]
 
   tags = {
