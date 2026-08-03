@@ -138,3 +138,30 @@ module "aks" {
     ManagedBy   = "Terraform"
   }
 }
+
+resource "time_sleep" "wait_for_agic_identity" {
+  depends_on = [
+    azurerm_kubernetes_cluster.this
+  ]
+
+  create_duration = "90s"
+}
+
+
+resource "azurerm_role_assignment" "agic_reader" {
+  scope = module.resource_group.resource_group_id
+  role_definition_name = "Reader"
+  principal_id = module.aks.agic_identity_object_id
+  depends_on = [
+    module.aks
+    ]
+}
+
+resource "azurerm_role_assignment" "agic_contributor" {
+  scope = module.application_gateway.application_gateway_id
+  role_definition_name = "Contributor"
+  principal_id = module.aks.agic_identity_object_id
+  depends_on = [
+    module.aks
+    ]
+}
