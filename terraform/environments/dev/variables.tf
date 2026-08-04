@@ -81,11 +81,6 @@ variable "max_count" {
   type = number
 }
 
-# variable "identity_name" {
-#   description = "User Assigned Managed Identity Name"
-#   type        = string
-# }
-
 variable "application_gateway_capacity" {
   description = "Application Gateway capacity"
   type        = number

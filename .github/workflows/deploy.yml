@@ -1,12 +1,12 @@
 name: Deploy Application to AKS
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "boutique-helm/**"
-      - ".github/workflows/deploy.yml"
+
+  workflow_run:
+    workflows:
+      - Build and Push to ACR
+    types:
+      - completed
 
   workflow_dispatch:
 
