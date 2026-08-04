@@ -7,14 +7,14 @@ on:
       - Terraform Infrastructure
     types:
       - completed
+  
+  workflow_dispatch:
 
 permissions:
   contents: read
   security-events: write
 
 jobs:
-
-
   gitleaks:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
@@ -56,7 +56,6 @@ jobs:
         with:
           sarif_file: trivy-fs-results.sarif
 
-
   owasp-dependency-check:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
@@ -66,7 +65,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
 
       - name: Run OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
@@ -78,12 +76,10 @@ jobs:
           args: >
             --enableExperimental
 
-
       - name: Upload OWASP results
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: reports/dependency-check-report.sarif
-
 
   sonarqube:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
@@ -92,12 +88,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
@@ -109,7 +103,6 @@ jobs:
           args: >
             -Dsonar.projectKey=Vrush-777_boutique-app_Microservices-Demo
             -Dsonar.organization=vrush-777
-
 
       - name: SonarQube Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@v1

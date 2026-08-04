@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   REGISTRY_URL: ${{ secrets.ACR_LOGIN_SERVER }}
@@ -42,7 +43,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
