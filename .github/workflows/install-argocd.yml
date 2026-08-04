@@ -1,0 +1,73 @@
+name: Install ArgoCD
+
+on:
+  workflow_run:
+    workflows:
+      - Terraform Infrastructure Pipeline
+    types:
+      - completed
+
+jobs:
+  install-argocd:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+
+    - name: Get AKS Credentials
+      run: |
+        az aks get-credentials \
+          --resource-group rg-devsecops-poc \
+          --name aks-boutique-dev \
+          --overwrite-existing
+
+
+    - name: Install ArgoCD Namespace
+      run: |
+        kubectl create namespace argocd \
+        --dry-run=client -o yaml | kubectl apply -f -
+
+
+    - name: Install ArgoCD
+      run: |
+        kubectl apply \
+        --server-side \
+        -n argocd \
+        -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+
+    - name: Wait for ArgoCD
+      run: |
+        kubectl wait \
+        --for=condition=Available \
+        deployment/argocd-server \
+        -n argocd \
+        --timeout=300s
+
+
+    - name: Expose ArgoCD Server
+      run: |
+        kubectl patch service argocd-server \
+        -n argocd \
+        --type merge \
+        -p '{"spec":{"type":"LoadBalancer"}}'
+
+    - name: Create Boutique ArgoCD Application
+      run: |
+        kubectl apply -f argocd/application.yaml
+
+    - name: Verify Installation
+      run: |
+        kubectl get pods -n argocd
+        kubectl get svc -n argocd
+        kubectl get applications -n argocd
