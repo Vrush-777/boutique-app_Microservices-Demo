@@ -308,14 +308,14 @@ jobs:
 
         docker tag \
         redis:7-alpine \
-        ${{ secrets.ACR_LOGIN_SERVER }}/redis:${{ github.sha }}
+        ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:${{ github.sha }}
     - name: Push Redis Image
       run: |
         docker push \
-        ${{ secrets.ACR_LOGIN_SERVER }}/redis:latest
+        ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:latest
 
         docker push \
-        ${{ secrets.ACR_LOGIN_SERVER }}/redis:${{ github.sha }}
+        ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:${{ github.sha }}
 
     - name: Redis completed
       run: |
