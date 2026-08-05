@@ -1,0 +1,360 @@
+name: Azure DevSecOps GitOps Pipeline
+
+on:
+  push:
+    branches: 
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+  security-events: write
+
+jobs:
+
+  terraform:
+    name: Terraform Infrastructure
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform/environments/dev
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+
+    - name: Azure Login
+      uses: azure/login@v2
+
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.14.0
+
+
+    - name: Terraform Init
+      run: terraform init
+
+    - name: Terraform Format
+      run: terraform fmt -recursive
+
+    - name: Terraform Validate
+      run: terraform validate
+
+    - name: Terraform Plan
+      run: terraform plan -var-file=dev.tfvars -out=tfplan
+
+    - name: Terraform Apply
+      run: terraform apply -auto-approve tfplan
+
+  install-argocd:
+
+    name: Install ArgoCD
+    needs: terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Get AKS Credentials
+        run: |
+          az aks get-credentials \
+            --resource-group rg-devsecops-poc \
+            --name aks-boutique-dev \
+            --overwrite-existing
+
+      - name: Create ArgoCD Namespace
+        run: |
+          kubectl create namespace argocd \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Install ArgoCD
+        run: |
+          kubectl apply \
+            -n argocd \
+            -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+      - name: Wait for ArgoCD Server
+        run: |
+          kubectl wait \
+            --for=condition=Available \
+            deployment/argocd-server \
+            -n argocd \
+            --timeout=600s
+
+      - name: Expose ArgoCD
+        run: |
+          kubectl patch svc argocd-server \
+          -n argocd \
+          --type merge \
+          -p '{"spec":{"type":"LoadBalancer"}}'
+
+      - name: Wait for External IP
+        run: |
+          echo "Waiting for LoadBalancer IP..."
+
+          for i in {1..30}; do
+
+            IP=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+            if [ ! -z "$IP" ]; then
+              echo "ArgoCD IP: $IP"
+              break
+            fi
+
+            sleep 20
+          done
+
+      - name: Create Boutique Application
+        run: |
+          kubectl apply -f argocd/application.yaml
+
+      - name: Verify ArgoCD
+        run: |
+          kubectl get pods -n argocd
+          kubectl get svc -n argocd
+          kubectl get applications -n argocd
+
+  security:
+    name: DevSecOps Security Scans
+    needs: install-argocd
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks Secret Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trivy Filesystem Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+           scan-type: fs
+           scan-ref: .
+           format: table
+           severity: HIGH,CRITICAL
+           exit-code: 0
+
+      - name: OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+
+        with:
+          project: boutique-app
+          path: .
+          format: HTML
+          out: reports
+
+      - name: Upload OWASP Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: reports
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=Vrush-777_boutique-app_Microservices-Demo
+            -Dsonar.organization=vrush-777
+
+      - name: SonarQube Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+   
+  build:
+    name: Build & Push Images
+    needs: security
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+
+      matrix:
+        service:
+          - frontend
+          - cartservice
+          - productcatalogservice
+          - currencyservice
+          - paymentservice
+          - shippingservice
+          - emailservice
+          - recommendationservice
+          - adservice
+          - checkoutservice
+          - loadgenerator
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    
+    - name: Login to ACR
+      run: |
+        az acr login \
+          --name vrushacr777
+
+    - name: Build and Push Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: src/${{ matrix.service }}
+        file: docker/${{ matrix.service }}/Dockerfile
+        push: false
+        load: true
+
+        tags: |
+          ${{ matrix.service }}:scan
+
+    - name: Trivy Image Scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ matrix.service }}:scan
+        format: table
+        severity: HIGH,CRITICAL
+        exit-code: 0
+
+    - name: Tag Images
+      run: |
+        docker tag \
+        ${{ matrix.service }}:scan \
+        ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
+
+        docker tag \
+        ${{ matrix.service }}:scan \
+        ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:${{ github.sha }}
+
+    - name: Push Latest
+      run: |
+        docker push \
+        ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
+
+    - name: Push SHA
+      run: |
+        docker push \
+        ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:${{ github.sha }}
+
+    - name: Finished
+      run: |
+        echo "${{ matrix.service }} pushed successfully."
+
+# ====================================================================
+
+  redis-image:
+    name: Push Redis Image
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    
+    - name: Login to ACR
+      run: |
+        az acr login \
+        --name vrushacr777
+    - name: Pull Redis Image
+      run: |
+        docker pull redis:7-alpine
+    - name: Tag Redis Image
+      run: |
+        docker tag \
+        redis:7-alpine \
+        ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:latest
+
+        docker tag \
+        redis:7-alpine \
+        ${{ secrets.ACR_LOGIN_SERVER }}/redis:${{ github.sha }}
+    - name: Push Redis Image
+      run: |
+        docker push \
+        ${{ secrets.ACR_LOGIN_SERVER }}/redis:latest
+
+        docker push \
+        ${{ secrets.ACR_LOGIN_SERVER }}/redis:${{ github.sha }}
+
+    - name: Redis completed
+      run: |
+        echo "Redis image pushed successfully."
+
+  update-values:
+    name: Update Helm Image Tag
+    needs:
+      - build 
+      - redis-image
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update Helm Image Tag
+      run: |
+        sed -i "s/IMAGE_TAG/${GITHUB_SHA}/g" boutique-helm/boutique/values.yaml
+    - name: verify values.yaml
+      run: |
+        cat boutique-helm/boutique/values.yaml
+    
+    - name: Configure Git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+    - name: Commit Changes
+      run: |
+        git add boutique-helm/boutique/values.yaml
+        git diff --cached --quiet || \
+        git commit -m "Update image tag to ${GITHUB_SHA}"
+
+    - name: Push Changes
+      run: |
+        git push origin main
