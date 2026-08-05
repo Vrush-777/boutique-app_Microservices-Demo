@@ -9,30 +9,22 @@ spec:
 
   project: default
   source:
-
-    # Your GitHub repository
     repoURL: https://github.com/Vrush-777/boutique-app_Microservices-Demo.git
-    # Branch
     targetRevision: main
-    # Helm chart location
     path: boutique-helm/boutique
 
   destination:
-    # Deploy into same AKS cluster
     server: https://kubernetes.default.svc
-    # Application namespace
     namespace: boutique
 
   syncPolicy:
     automated:
-      # Remove resources deleted from Git
       prune: true
-      # Fix manual changes automatically
       selfHeal: true
 
-  retry:
-    limit: 5
-    backoff:
+    retry:
+     limit: 5
+     backoff:
       duration: 10s
       factor: 2
       maxDuration: 3m
