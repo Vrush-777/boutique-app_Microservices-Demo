@@ -16,6 +16,7 @@ appgw_subnet_prefix = "10.1.2.0/24"
 jump_subnet_name   = "jump-subnet"
 jump_subnet_prefix = "10.1.3.0/24"
 
+
 acr_name = "vrushacr777"
 
 acr_sku = "Basic"

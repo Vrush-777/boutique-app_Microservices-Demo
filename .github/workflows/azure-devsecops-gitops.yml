@@ -41,15 +41,6 @@ jobs:
       with:
         terraform_version: 1.14.0
 
-    - name: Prepare SSH Key
-      shell: bash
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.JUMP_VM_SSH_PRIVATE_KEY }}" > ~/.ssh/jump-vm
-        chmod 600 ~/.ssh/jump-vm
-        ssh-keygen -y -f ~/.ssh/jump-vm > ~/.ssh/jump-vm.pub
-        echo "SSH public key generated successfully."
-
     - name: Terraform Init
       run: terraform init
 
@@ -60,11 +51,7 @@ jobs:
       run: terraform validate
 
     - name: Terraform Plan
-      run: |
-        terraform plan \
-          -var-file=dev.tfvars \
-          -var="jump_vm_ssh_public_key=$(cat ~/.ssh/jump-vm.pub)" \
-          -out=tfplan
+      run: terraform plan -var-file=dev.tfvars -var="jump_vm_ssh_public_key=${{ secrets.JUMP_VM_SSH_PUBLIC_KEY }}" -out=tfplan
 
     - name: Terraform Apply
       run: terraform apply -auto-approve tfplan
@@ -75,12 +62,6 @@ jobs:
         JUMP_IP=$(terraform output -raw jump_vm_public_ip)
         echo "Jump VM Public IP: $JUMP_IP"
         echo "jump_ip=$JUMP_IP" >> "$GITHUB_OUTPUT"
-
-    - name: Setup SSH key
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.JUMP_VM_SSH_PRIVATE_KEY }}" > ~/.ssh/jump-vm
-        chmod 600 ~/.ssh/jump-vm
       
     - name: Wait for Azure RBAC propagation
       shell: bash
@@ -100,6 +81,7 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Gitleaks Secret Scan
@@ -327,9 +309,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
-      - name: Checkout Repository
+      - name: Checkout Latest Main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
       - name: Azure Login
         uses: azure/login@v2
@@ -347,7 +331,18 @@ jobs:
           echo "${{ secrets.JUMP_VM_SSH_PRIVATE_KEY }}" > ~/.ssh/jump-vm
           chmod 600 ~/.ssh/jump-vm
 
+          echo "Jump VM IP:"
+          echo "${{ needs.terraform.outputs.jump_vm_ip }}"
+
           ssh-keyscan -H "${{ needs.terraform.outputs.jump_vm_ip }}" >> ~/.ssh/known_hosts
+
+      - name: Test SSH Connection
+        shell: bash
+        run: |
+          ssh -i ~/.ssh/jump-vm \
+            -o StrictHostKeyChecking=yes \
+            azureuser@${{ needs.terraform.outputs.jump_vm_ip }} \
+            "echo 'SSH connection to Jump VM successful'"
 
       - name: Copy deployment files to Jump VM
         shell: bash
@@ -357,8 +352,12 @@ jobs:
             "mkdir -p /opt/deploy/boutique"
 
           scp -i ~/.ssh/jump-vm \
-          -r boutique-helm \
-          azureuser@${{ needs.terraform.outputs.jump_vm_ip }}:/opt/deploy/boutique/
+            -r boutique-helm \
+            azureuser@${{ needs.terraform.outputs.jump_vm_ip }}:/opt/deploy/boutique/
+
+          scp -i ~/.ssh/jump-vm \
+            scripts/deploy-boutique.sh \
+            azureuser@${{ needs.terraform.outputs.jump_vm_ip }}:/opt/deploy/
 
       - name: Deploy Boutique from Jump VM
         shell: bash
@@ -367,6 +366,6 @@ jobs:
         run: |
           ssh -i ~/.ssh/jump-vm \
             azureuser@${{ needs.terraform.outputs.jump_vm_ip }} \
-            "cd /opt/deploy/boutique && \
-            AZURE_SUBSCRIPTION_ID='${AZURE_SUBSCRIPTION_ID}' \
-            bash -s" < scripts/deploy-boutique.sh
+            "chmod +x /opt/deploy/deploy-from-jump.sh && \
+            AZURE_SUBSCRIPTION_ID='${AZURE_SUBSCRIPTION_ID}'\
+             bash /opt/deploy/deploy-boutique.sh"
