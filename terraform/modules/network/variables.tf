@@ -30,6 +30,14 @@ variable "appgw_subnet_prefix" {
   type = string
 }
 
+variable "jump_subnet_name" {
+  type = string
+}
+
+variable "jump_subnet_prefix" {
+  type = string
+}
+
 variable "tags" {
 
   type    = map(string)

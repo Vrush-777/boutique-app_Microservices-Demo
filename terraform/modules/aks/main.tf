@@ -1,11 +1,12 @@
 resource "azurerm_kubernetes_cluster" "this" {
 
-  name                = var.cluster_name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  dns_prefix          = var.dns_prefix
-  kubernetes_version  = var.kubernetes_version
-  sku_tier            = "Free"
+  name                    = var.cluster_name
+  location                = var.location
+  resource_group_name     = var.resource_group_name
+  dns_prefix              = var.dns_prefix
+  private_cluster_enabled = true
+  kubernetes_version      = var.kubernetes_version
+  sku_tier                = "Free"
 
   ingress_application_gateway {
     gateway_id = var.application_gateway_id
@@ -47,7 +48,7 @@ resource "azurerm_kubernetes_cluster" "this" {
 
 }
 
-resource "azurerm_role_assignment" "acr_pull" {
+resource "azurerm_role_assignment" "aks_acr_pull" {
   scope                = var.acr_id
   role_definition_name = "AcrPull"
   principal_id         = azurerm_kubernetes_cluster.this.kubelet_identity[0].object_id

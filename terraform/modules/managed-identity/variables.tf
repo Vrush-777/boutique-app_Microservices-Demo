@@ -13,25 +13,7 @@ variable "location" {
   type        = string
 }
 
-variable "acr_id" {
-  description = "Azure Container Registry ID"
-  type        = string
-}
-
 variable "tags" {
   type    = map(string)
   default = {}
-}
-
-variable "resource_group_id" {
-  type = string
-}
-
-variable "appgw_subnet_id" {
-  type = string
-}
-
-variable "application_gateway_id" {
-  description = "Application Gateway ID"
-  type        = string
 }

@@ -1,5 +1,4 @@
 resource "azurerm_public_ip" "this" {
-
   name                = "${var.application_gateway_name}-pip"
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -10,11 +9,25 @@ resource "azurerm_public_ip" "this" {
   tags = var.tags
 }
 
-resource "azurerm_application_gateway" "this" {
 
+resource "azurerm_user_assigned_identity" "appgw" {
+  name                = "${var.application_gateway_name}-identity"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+
+  tags = var.tags
+}
+
+
+resource "azurerm_application_gateway" "this" {
   name                = var.application_gateway_name
   location            = var.location
   resource_group_name = var.resource_group_name
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.appgw.id]
+  }
 
   sku {
     name = "Standard_v2"

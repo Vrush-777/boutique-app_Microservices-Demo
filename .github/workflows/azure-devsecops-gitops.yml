@@ -17,6 +17,10 @@ jobs:
   terraform:
     name: Terraform Infrastructure
     runs-on: ubuntu-latest
+
+    outputs:
+    jump_vm_ip: ${{ steps.jump-ip.outputs.jump_ip }}
+
     defaults:
       run:
         working-directory: terraform/environments/dev
@@ -56,89 +60,28 @@ jobs:
     - name: Terraform Apply
       run: terraform apply -auto-approve tfplan
 
-  install-argocd:
+    - name: Get Jump VM Public IP
+      id: jump-ip
+      run: |
+        JUMP_IP=$(terraform output -raw jump_vm_public_ip)
+        echo "Jump VM Public IP: $JUMP_IP"
+        echo "jump_ip=$JUMP_IP" >> "$GITHUB_OUTPUT"
 
-    name: Install ArgoCD
-    needs: terraform
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Get AKS Credentials
-        run: |
-          az aks get-credentials \
-            --resource-group rg-devsecops-poc \
-            --name aks-boutique-dev \
-            --overwrite-existing
-
-      - name: Create ArgoCD Namespace
-        run: |
-          kubectl create namespace argocd \
-          --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: Install ArgoCD
-        run: |
-          kubectl apply \
-            --server-side \
-            -n argocd \
-            -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-
-      - name: Wait for ArgoCD Server
-        run: |
-          kubectl wait \
-            --for=condition=Available \
-            deployment/argocd-server \
-            -n argocd \
-            --timeout=600s
-
-      - name: Expose ArgoCD
-        run: |
-          kubectl patch svc argocd-server \
-          -n argocd \
-          --type merge \
-          -p '{"spec":{"type":"LoadBalancer"}}'
-
-      - name: Wait for External IP
-        run: |
-          echo "Waiting for LoadBalancer IP..."
-
-          for i in {1..30}; do
-
-            IP=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-
-            if [ ! -z "$IP" ]; then
-              echo "ArgoCD IP: $IP"
-              break
-            fi
-
-            sleep 20
-          done
-
-      - name: Create Boutique Application
-        run: |
-          kubectl apply -f argocd/application.yaml
-
-      - name: Verify ArgoCD
-        run: |
-          kubectl get pods -n argocd
-          kubectl get svc -n argocd
-          kubectl get applications -n argocd
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.JUMP_VM_SSH_PRIVATE_KEY }}" > ~/.ssh/jump-vm
+        chmod 600 ~/.ssh/jump-vm
+      
+    - name: Wait for Azure RBAC propagation
+      shell: bash
+      run: |
+        echo "Waiting for Jump VM RBAC assignments to propagate..."
+        sleep 120
 
   security:
     name: DevSecOps Security Scans
-    needs: install-argocd
+    needs: terraform
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -340,11 +283,18 @@ jobs:
 
     - name: Update Helm Image Tag
       run: |
-        sed -i "s/IMAGE_TAG/${GITHUB_SHA}/g" boutique-helm/boutique/values.yaml
-    - name: verify values.yaml
+        sed -i -E "s|^  tag:.*|  tag: \"${GITHUB_SHA}\"|" boutique-helm/boutique/values.yaml
+
+    - name: Verify Helm Image Tag
       run: |
-        cat boutique-helm/boutique/values.yaml
+        echo "Updated image tags:"
+        grep -E "^[[:space:]]+tag:" boutique-helm/boutique/values.yaml
     
+    - name: Verify values.yaml
+      run: |
+        echo "===== Updated values.yaml ====="
+        cat boutique-helm/boutique/values.yaml
+
     - name: Configure Git
       run: |
         git config user.name "github-actions[bot]"
@@ -359,3 +309,55 @@ jobs:
     - name: Push Changes
       run: |
         git push origin main
+
+  deploy:
+    name: Deploy Boutique from Jump VM
+    needs:
+      - terraform
+      - update-values
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Prepare SSH
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          echo "${{ secrets.JUMP_VM_SSH_PRIVATE_KEY }}" > ~/.ssh/jump-vm
+          chmod 600 ~/.ssh/jump-vm
+
+          ssh-keyscan -H "${{ needs.terraform.outputs.jump_vm_ip }}" >> ~/.ssh/known_hosts
+
+      - name: Copy deployment files to Jump VM
+        shell: bash
+        run: |
+          ssh -i ~/.ssh/jump-vm \
+            azureuser@${{ steps.jump.outputs.jump_ip }} \
+            "mkdir -p /opt/deploy/boutique"
+
+          scp -i ~/.ssh/jump-vm \
+            -r boutique-helm \
+            azureuser@${{ steps.jump.outputs.jump_ip }}:/opt/deploy/boutique/
+
+      - name: Deploy Boutique from Jump VM
+        shell: bash
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          ssh -i ~/.ssh/jump-vm \
+            azureuser@${{ steps.jump.outputs.jump_ip }} \
+            "cd /opt/deploy/boutique && \
+            AZURE_SUBSCRIPTION_ID='${AZURE_SUBSCRIPTION_ID}' \
+            bash -s" < scripts/deploy-boutique.sh

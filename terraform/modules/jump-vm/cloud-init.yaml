@@ -1,0 +1,46 @@
+#cloud-config
+
+package_update: true
+
+packages:
+  - curl
+  - unzip
+  - git
+  - apt-transport-https
+  - ca-certificates
+  - gnupg
+  - lsb-release
+
+users:
+  - name: azureuser
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: sudo
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+runcmd:
+
+  # Install Azure CLI
+  - curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+
+  # Install kubectl and kubelogin
+  - az aks install-cli
+
+  # Install Helm
+  - curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+  # Create deployment directory
+  - mkdir -p /opt/deploy
+  - chown azureuser:azureuser /opt/deploy
+
+  # Create Azure CLI configuration directory for azureuser
+  - mkdir -p /home/azureuser/.azure
+  - chown -R azureuser:azureuser /home/azureuser/.azure
+
+  # SSH permissions
+  - chmod 700 /home/azureuser/.ssh
+  - chmod 600 /home/azureuser/.ssh/authorized_keys
+  - chown -R azureuser:azureuser /home/azureuser/.ssh
+
+final_message: "Jump VM initialization completed."

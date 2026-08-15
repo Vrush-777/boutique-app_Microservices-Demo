@@ -19,3 +19,7 @@ output "admin_password" {
   value     = azurerm_container_registry.this.admin_password
   sensitive = true
 }
+
+output "id" {
+  value = azurerm_container_registry.this.id
+}
