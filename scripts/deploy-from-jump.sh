@@ -6,11 +6,6 @@ echo "========================================"
 echo "Starting Boutique deployment"
 echo "========================================"
 
-if [ -z "${AZURE_SUBSCRIPTION_ID}" ]; then
-  echo "ERROR: AZURE_SUBSCRIPTION_ID is not set"
-  exit 1
-fi
-
 RESOURCE_GROUP="rg-devsecops-poc"
 AKS_NAME="aks-boutique-dev"
 ACR_NAME="vrushacr777"
@@ -26,7 +21,9 @@ az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
 
 echo "3. Verify Azure identity"
 
-az account show --query "{name:name,id:id,tenantId:tenantId}" -o table
+az account show \
+  --query "{name:name,id:id,tenantId:tenantId}" \
+  -o table
 
 echo "4. Get AKS credentials"
 
@@ -43,11 +40,14 @@ echo "6. Verify AKS access"
 
 kubectl get nodes
 
-echo "7. Login to ACR"
+echo "7. Verify ACR access"
 
-az acr login --name "${ACR_NAME}"
+az acr show \
+  --name "${ACR_NAME}" \
+  --query "{name:name, loginServer:loginServer}" \
+  --output table
 
-echo "8. Verify ACR"
+echo "8. Verify ACR repositories"
 
 az acr repository list \
   --name "${ACR_NAME}" \

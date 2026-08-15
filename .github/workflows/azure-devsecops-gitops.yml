@@ -543,6 +543,4 @@ jobs:
             -i ~/.ssh/jump-vm \
             -o StrictHostKeyChecking=no \
             azureuser@"$JUMP_IP" \
-            "cd /opt/deploy/boutique && AZURE_SUBSCRIPTION_ID='$AZURE_SUBSCRIPTION_ID' bash /opt/deploy/deploy-from-jump.sh"
-
-          echo "Boutique deployment completed successfully."
+            "cd /opt/deploy/boutique && AZURE_SUBSCRIPTION_ID='${AZURE_SUBSCRIPTION_ID}' bash /opt/deploy/deploy-from-jump.sh"
