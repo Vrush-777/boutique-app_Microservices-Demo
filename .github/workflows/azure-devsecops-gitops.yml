@@ -2,7 +2,7 @@ name: Azure DevSecOps GitOps Pipeline
 
 on:
   push:
-    branches: 
+    branches:
       - main
 
   workflow_dispatch:
@@ -13,6 +13,10 @@ permissions:
   security-events: write
 
 jobs:
+
+  # ============================================================
+  # 1. TERRAFORM INFRASTRUCTURE
+  # ============================================================
 
   terraform:
     name: Terraform Infrastructure
@@ -26,90 +30,160 @@ jobs:
         working-directory: terraform/environments/dev
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.0
+
+      # --------------------------------------------------------
+      # Generate SSH public key from GitHub secret
+      # --------------------------------------------------------
+
+      - name: Prepare SSH Key
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p ~/.ssh
+
+          echo "${{ secrets.JUMP_VM_SSH_PRIVATE_KEY }}" > ~/.ssh/jump-vm
+          chmod 600 ~/.ssh/jump-vm
+
+          ssh-keygen -y \
+            -f ~/.ssh/jump-vm \
+            > ~/.ssh/jump-vm.pub
+
+          chmod 644 ~/.ssh/jump-vm.pub
+
+          echo "SSH public key generated successfully."
+
+          test -s ~/.ssh/jump-vm.pub
+
+          echo "SSH public key file exists."
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Format
+        run: terraform fmt -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      # --------------------------------------------------------
+      # Terraform Plan
+      # --------------------------------------------------------
+
+      - name: Terraform Plan
+        shell: bash
+        run: |
+          set -e
+
+          test -s ~/.ssh/jump-vm.pub
+
+          SSH_PUBLIC_KEY=$(cat ~/.ssh/jump-vm.pub)
+
+          echo "SSH public key is available."
+
+          terraform plan \
+            -var-file=dev.tfvars \
+            -var="jump_vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
+            -out=tfplan
+
+      # --------------------------------------------------------
+      # Terraform Apply
+      # --------------------------------------------------------
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+      # --------------------------------------------------------
+      # Get Jump VM IP
+      # --------------------------------------------------------
+
+      - name: Get Jump VM Public IP
+        id: jump-ip
+        shell: bash
+        run: |
+          set -e
+
+          JUMP_IP=$(terraform output -raw jump_vm_public_ip)
+
+          echo "Jump VM Public IP: $JUMP_IP"
+
+          echo "jump_ip=$JUMP_IP" >> "$GITHUB_OUTPUT"
+
+      # --------------------------------------------------------
+      # Wait for Azure RBAC propagation
+      # --------------------------------------------------------
+
+      - name: Wait for Azure RBAC propagation
+        shell: bash
+        run: |
+          echo "Waiting for Jump VM RBAC assignments to propagate..."
+          sleep 120
 
 
-    - name: Azure Login
-      uses: azure/login@v2
-
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: 1.14.0
-
-    - name: Terraform Init
-      run: terraform init
-
-    - name: Terraform Format
-      run: terraform fmt -recursive
-
-    - name: Terraform Validate
-      run: terraform validate
-
-    - name: Terraform Plan
-      shell: bash
-      run: |
-        SSH_PUBLIC_KEY=$(cat ~/.ssh/jump-vm.pub)
-        terraform plan \
-          -var-file=dev.tfvars \
-          -var "jump_vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
-          -out=tfplan
-
-    - name: Terraform Apply
-      run: terraform apply -auto-approve tfplan
-
-    - name: Get Jump VM Public IP
-      id: jump-ip
-      run: |
-        JUMP_IP=$(terraform output -raw jump_vm_public_ip)
-        echo "Jump VM Public IP: $JUMP_IP"
-        echo "jump_ip=$JUMP_IP" >> "$GITHUB_OUTPUT"
-      
-    - name: Wait for Azure RBAC propagation
-      shell: bash
-      run: |
-        echo "Waiting for Jump VM RBAC assignments to propagate..."
-        sleep 120
+  # ============================================================
+  # 2. SECURITY SCANS
+  # ============================================================
 
   security:
     name: DevSecOps Security Scans
     needs: terraform
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       security-events: write
 
     steps:
-      - name: checkout repository
+
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
+
+      # --------------------------------------------------------
+      # Gitleaks
+      # --------------------------------------------------------
 
       - name: Gitleaks Secret Scan
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # --------------------------------------------------------
+      # Trivy Filesystem Scan
+      # --------------------------------------------------------
+
       - name: Trivy Filesystem Scan
         uses: aquasecurity/trivy-action@master
         with:
-           scan-type: fs
-           scan-ref: .
-           format: table
-           severity: HIGH,CRITICAL
-           exit-code: 0
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: 0
+
+      # --------------------------------------------------------
+      # OWASP Dependency Check
+      # --------------------------------------------------------
 
       - name: OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
-
         with:
           project: boutique-app
           path: .
@@ -121,6 +195,10 @@ jobs:
         with:
           name: dependency-check-report
           path: reports
+
+      # --------------------------------------------------------
+      # SonarQube
+      # --------------------------------------------------------
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
@@ -138,14 +216,19 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-   
+
+
+  # ============================================================
+  # 3. BUILD AND PUSH APPLICATION IMAGES
+  # ============================================================
+
   build:
     name: Build & Push Images
     needs: security
     runs-on: ubuntu-latest
+
     strategy:
       fail-fast: false
-
       matrix:
         service:
           - frontend
@@ -159,170 +242,14 @@ jobs:
           - adservice
           - checkoutservice
           - loadgenerator
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-
-    - name: Setup Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Azure Login
-      uses: azure/login@v2
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-    
-    - name: Login to ACR
-      run: |
-        az acr login \
-          --name vrushacr777
-
-    - name: Build and Push Docker Image
-      uses: docker/build-push-action@v5
-      with:
-        context: src/${{ matrix.service }}
-        file: docker/${{ matrix.service }}/Dockerfile
-        push: false
-        load: true
-
-        tags: |
-          ${{ matrix.service }}:scan
-
-    - name: Trivy Image Scan
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ matrix.service }}:scan
-        format: table
-        severity: HIGH,CRITICAL
-        exit-code: 0
-
-    - name: Tag Images
-      run: |
-        docker tag \
-        ${{ matrix.service }}:scan \
-        ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
-
-        docker tag \
-        ${{ matrix.service }}:scan \
-        ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:${{ github.sha }}
-
-    - name: Push Latest
-      run: |
-        docker push \
-        ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
-
-    - name: Push SHA
-      run: |
-        docker push \
-        ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:${{ github.sha }}
-
-    - name: Finished
-      run: |
-        echo "${{ matrix.service }} pushed successfully."
-
-# ====================================================================
-
-  redis-image:
-    name: Push Redis Image
-    needs: build
-    runs-on: ubuntu-latest
 
     steps:
-    - name: Azure Login
-      uses: azure/login@v2
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-    
-    - name: Login to ACR
-      run: |
-        az acr login \
-        --name vrushacr777
-    - name: Pull Redis Image
-      run: |
-        docker pull redis:7-alpine
-    - name: Tag Redis Image
-      run: |
-        docker tag \
-        redis:7-alpine \
-        ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:latest
 
-        docker tag \
-        redis:7-alpine \
-        ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:${{ github.sha }}
-    - name: Push Redis Image
-      run: |
-        docker push \
-        ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:latest
-
-        docker push \
-        ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:${{ github.sha }}
-
-    - name: Redis completed
-      run: |
-        echo "Redis image pushed successfully."
-
-  update-values:
-    name: Update Helm Image Tag
-    needs:
-      - build 
-      - redis-image
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-      with:
-        ref: main
-        token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Update Helm Image Tag
-      run: |
-        sed -i -E "s|^  tag:.*|  tag: \"${GITHUB_SHA}\"|" boutique-helm/boutique/values.yaml
-
-    - name: Verify Helm Image Tag
-      run: |
-        echo "Updated image tags:"
-        grep -E "^[[:space:]]+tag:" boutique-helm/boutique/values.yaml
-    
-    - name: Verify values.yaml
-      run: |
-        echo "===== Updated values.yaml ====="
-        cat boutique-helm/boutique/values.yaml
-
-    - name: Configure Git
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-    - name: Commit Changes
-      run: |
-        git add boutique-helm/boutique/values.yaml
-        git diff --cached --quiet || \
-        git commit -m "Update image tag to ${GITHUB_SHA}"
-
-    - name: Push Changes
-      run: |
-        git push origin main
-
-  deploy:
-    name: Deploy Boutique from Jump VM
-    needs:
-      - terraform
-      - update-values
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Latest Main
+      - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Azure Login
         uses: azure/login@v2
@@ -331,48 +258,317 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Prepare SSH
+      - name: Login to ACR
+        run: |
+          az acr login \
+            --name vrushacr777
+
+      # --------------------------------------------------------
+      # Build image
+      # --------------------------------------------------------
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: src/${{ matrix.service }}
+          file: docker/${{ matrix.service }}/Dockerfile
+          push: false
+          load: true
+          tags: |
+            ${{ matrix.service }}:scan
+
+      # --------------------------------------------------------
+      # Trivy image scan
+      # --------------------------------------------------------
+
+      - name: Trivy Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ matrix.service }}:scan
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: 0
+
+      # --------------------------------------------------------
+      # Tag image
+      # --------------------------------------------------------
+
+      - name: Tag Images
+        run: |
+          docker tag \
+            ${{ matrix.service }}:scan \
+            ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
+
+          docker tag \
+            ${{ matrix.service }}:scan \
+            ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:${{ github.sha }}
+
+      # --------------------------------------------------------
+      # Push latest
+      # --------------------------------------------------------
+
+      - name: Push Latest
+        run: |
+          docker push \
+            ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:latest
+
+      # --------------------------------------------------------
+      # Push SHA
+      # --------------------------------------------------------
+
+      - name: Push SHA
+        run: |
+          docker push \
+            ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.service }}:${{ github.sha }}
+
+      - name: Finished
+        run: |
+          echo "${{ matrix.service }} pushed successfully."
+
+
+  # ============================================================
+  # 4. PUSH REDIS IMAGE
+  # ============================================================
+
+  redis-image:
+    name: Push Redis Image
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: |
+          az acr login \
+            --name vrushacr777
+
+      - name: Pull Redis Image
+        run: |
+          docker pull redis:7-alpine
+
+      - name: Tag Redis Image
+        run: |
+          docker tag \
+            redis:7-alpine \
+            ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:latest
+
+          docker tag \
+            redis:7-alpine \
+            ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:${{ github.sha }}
+
+      - name: Push Redis Image
+        run: |
+          docker push \
+            ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:latest
+
+          docker push \
+            ${{ secrets.ACR_LOGIN_SERVER }}/redis-cart:${{ github.sha }}
+
+      - name: Redis Completed
+        run: |
+          echo "Redis image pushed successfully."
+
+
+  # ============================================================
+  # 5. UPDATE HELM IMAGE TAG
+  # ============================================================
+
+  update-values:
+    name: Update Helm Image Tag
+    needs:
+      - build
+      - redis-image
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Update Helm Image Tag
+        run: |
+          sed -i -E \
+            "s|^  tag:.*|  tag: \"${GITHUB_SHA}\"|" \
+            boutique-helm/boutique/values.yaml
+
+      - name: Verify Helm Image Tag
+        run: |
+          echo "Updated image tags:"
+          grep -E "^[[:space:]]+tag:" \
+            boutique-helm/boutique/values.yaml
+
+      - name: Verify values.yaml
+        run: |
+          echo "===== Updated values.yaml ====="
+          cat boutique-helm/boutique/values.yaml
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit Changes
+        run: |
+          git add boutique-helm/boutique/values.yaml
+
+          git diff --cached --quiet || \
+            git commit \
+              -m "Update image tag to ${GITHUB_SHA}"
+
+      - name: Push Changes
+        run: |
+          git push origin main
+
+
+  # ============================================================
+  # 6. DEPLOY TO PRIVATE AKS FROM JUMP VM
+  # ============================================================
+
+  deploy:
+    name: Deploy Boutique from Jump VM
+    needs:
+      - terraform
+      - update-values
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # --------------------------------------------------------
+      # Checkout latest main
+      # --------------------------------------------------------
+
+      - name: Checkout Latest Main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      # --------------------------------------------------------
+      # Azure Login
+      # --------------------------------------------------------
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # --------------------------------------------------------
+      # Prepare SSH private key
+      # --------------------------------------------------------
+
+      - name: Prepare SSH Key
         shell: bash
         run: |
-          mkdir -p ~/.ssh
+          set -e
 
-          echo "${{ secrets.JUMP_VM_SSH_PRIVATE_KEY }}" > ~/.ssh/jump-vm
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          echo "${{ secrets.JUMP_VM_SSH_PRIVATE_KEY }}" \
+            > ~/.ssh/jump-vm
+
           chmod 600 ~/.ssh/jump-vm
 
-          ssh-keygen -y -f ~/.ssh/jump-vm > ~/.ssh/jump-vm.pub
+          ssh-keygen -y \
+            -f ~/.ssh/jump-vm \
+            > ~/.ssh/jump-vm.pub
 
-          echo "SSH public key generated successfully."
+          chmod 644 ~/.ssh/jump-vm.pub
+
+          echo "SSH key prepared successfully."
+
+      # --------------------------------------------------------
+      # Add Jump VM to known_hosts
+      # --------------------------------------------------------
+
+      - name: Add Jump VM to Known Hosts
+        shell: bash
+        run: |
+          ssh-keyscan -H \
+            "${{ needs.terraform.outputs.jump_vm_ip }}" \
+            >> ~/.ssh/known_hosts
+
+      # --------------------------------------------------------
+      # Test SSH connection
+      # --------------------------------------------------------
 
       - name: Test SSH Connection
         shell: bash
         run: |
-          ssh -i ~/.ssh/jump-vm \
+          ssh \
+            -i ~/.ssh/jump-vm \
             -o StrictHostKeyChecking=yes \
             azureuser@${{ needs.terraform.outputs.jump_vm_ip }} \
             "echo 'SSH connection to Jump VM successful'"
 
-      - name: Copy deployment files to Jump VM
+      # --------------------------------------------------------
+      # Create deployment directory
+      # --------------------------------------------------------
+
+      - name: Create Deployment Directory
         shell: bash
         run: |
-          ssh -i ~/.ssh/jump-vm \
+          ssh \
+            -i ~/.ssh/jump-vm \
             azureuser@${{ needs.terraform.outputs.jump_vm_ip }} \
             "mkdir -p /opt/deploy/boutique"
 
-          scp -i ~/.ssh/jump-vm \
+      # --------------------------------------------------------
+      # Copy Helm chart
+      # --------------------------------------------------------
+
+      - name: Copy Helm Chart to Jump VM
+        shell: bash
+        run: |
+          scp \
+            -i ~/.ssh/jump-vm \
             -r boutique-helm \
             azureuser@${{ needs.terraform.outputs.jump_vm_ip }}:/opt/deploy/boutique/
 
-          scp -i ~/.ssh/jump-vm \
-            scripts/deploy-boutique.sh \
+      # --------------------------------------------------------
+      # Copy deployment script
+      # --------------------------------------------------------
+
+      - name: Copy Deployment Script
+        shell: bash
+        run: |
+          scp \
+            -i ~/.ssh/jump-vm \
+            scripts/deploy-from-jump.sh \
             azureuser@${{ needs.terraform.outputs.jump_vm_ip }}:/opt/deploy/
+
+      # --------------------------------------------------------
+      # Deploy application
+      # --------------------------------------------------------
 
       - name: Deploy Boutique from Jump VM
         shell: bash
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
-          ssh -i ~/.ssh/jump-vm \
+          ssh \
+            -i ~/.ssh/jump-vm \
             azureuser@${{ needs.terraform.outputs.jump_vm_ip }} \
             "chmod +x /opt/deploy/deploy-from-jump.sh && \
-            AZURE_SUBSCRIPTION_ID='${AZURE_SUBSCRIPTION_ID}'\
-             bash /opt/deploy/deploy-boutique.sh"
+             cd /opt/deploy/boutique && \
+             AZURE_SUBSCRIPTION_ID='${AZURE_SUBSCRIPTION_ID}' \
+             bash /opt/deploy/deploy-from-jump.sh
