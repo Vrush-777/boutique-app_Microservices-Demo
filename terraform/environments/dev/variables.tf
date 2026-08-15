@@ -94,3 +94,10 @@ variable "application_gateway_capacity" {
   type        = number
   default     = 2
 }
+
+variable "jump_vm_ssh_public_key" {
+  description = "SSH public key for Jump VM"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

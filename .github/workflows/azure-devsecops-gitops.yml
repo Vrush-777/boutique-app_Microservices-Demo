@@ -41,6 +41,14 @@ jobs:
       with:
         terraform_version: 1.14.0
 
+    - name: Prepare SSH Key
+      shell: bash
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.JUMP_VM_SSH_PRIVATE_KEY }}" > ~/.ssh/jump-vm
+        chmod 600 ~/.ssh/jump-vm
+        ssh-keygen -y -f ~/.ssh/jump-vm > ~/.ssh/jump-vm.pub
+        echo "SSH public key generated successfully."
 
     - name: Terraform Init
       run: terraform init
@@ -52,7 +60,11 @@ jobs:
       run: terraform validate
 
     - name: Terraform Plan
-      run: terraform plan -var-file=dev.tfvars -out=tfplan
+      run: |
+        terraform plan \
+          -var-file=dev.tfvars \
+          -var="jump_vm_ssh_public_key=$(cat ~/.ssh/jump-vm.pub)" \
+          -out=tfplan
 
     - name: Terraform Apply
       run: terraform apply -auto-approve tfplan
