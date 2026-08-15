@@ -1,5 +1,4 @@
 module "resource_group" {
-
   source = "../../modules/resource-group"
 
   resource_group_name = var.resource_group_name
@@ -12,8 +11,8 @@ module "resource_group" {
   }
 }
 
-module "network" {
 
+module "network" {
   source = "../../modules/network"
 
   resource_group_name = module.resource_group.resource_group_name
@@ -28,6 +27,9 @@ module "network" {
   appgw_subnet_name   = var.appgw_subnet_name
   appgw_subnet_prefix = var.appgw_subnet_prefix
 
+  jump_subnet_name   = var.jump_subnet_name
+  jump_subnet_prefix = var.jump_subnet_prefix
+
   tags = {
     Environment = "dev"
     Project     = "online-boutique"
@@ -35,8 +37,8 @@ module "network" {
   }
 }
 
-module "acr" {
 
+module "acr" {
   source = "../../modules/acr"
 
   acr_name            = var.acr_name
@@ -53,35 +55,7 @@ module "acr" {
   }
 }
 
-# module "managed_identity" {
-
-#   source = "../../modules/managed-identity"
-
-#   identity_name = var.identity_name
-
-#   resource_group_name = module.resource_group.resource_group_name
-
-#   location = module.resource_group.location
-
-
-#   acr_id = module.acr.acr_id
-
-
-#   resource_group_id = module.resource_group.resource_group_id
-
-
-#   appgw_subnet_id = module.network.appgw_subnet_id
-
-
-#   tags = {
-#     Environment = "dev"
-#     Project     = "online-boutique"
-#     ManagedBy   = "Terraform"
-#   }
-# }
-
 module "application_gateway" {
-
   source = "../../modules/application-gateway"
 
   application_gateway_name = var.application_gateway_name
@@ -91,7 +65,6 @@ module "application_gateway" {
 
   subnet_id = module.network.appgw_subnet_id
 
-
   tags = {
     Environment = "dev"
     Project     = "online-boutique"
@@ -99,28 +72,21 @@ module "application_gateway" {
   }
 }
 
-
 module "aks" {
-
   source = "../../modules/aks"
 
   cluster_name = var.cluster_name
-
-  dns_prefix = var.dns_prefix
+  dns_prefix   = var.dns_prefix
 
   resource_group_name = module.resource_group.resource_group_name
-
-  location = module.resource_group.location
+  location            = module.resource_group.location
 
   kubernetes_version = var.kubernetes_version
 
-  vm_size = var.vm_size
-
+  vm_size    = var.vm_size
   node_count = var.node_count
-
-  min_count = var.min_count
-
-  max_count = var.max_count
+  min_count  = var.min_count
+  max_count  = var.max_count
 
   aks_subnet_id = module.network.aks_subnet_id
 
@@ -138,4 +104,47 @@ module "aks" {
     Project     = "online-boutique"
     ManagedBy   = "Terraform"
   }
+}
+
+module "jump_vm" {
+  source = "../../modules/jump-vm"
+
+  vm_name             = "jump-vm"
+  location            = module.resource_group.location
+  resource_group_name = module.resource_group.resource_group_name
+
+  subscription_id = var.subscription_id
+  aks_name        = var.cluster_name
+
+  subnet_id = module.network.jump_subnet_id
+
+  admin_username = "azureuser"
+  public_key     = file(pathexpand("~/.ssh/id_rsa.pub"))
+
+  acr_id = module.acr.id
+
+  admin_source_ip = "0.0.0.0/0"
+}
+
+
+resource "azurerm_role_assignment" "jump_vm_aks_user" {
+  scope                = module.aks.cluster_id
+  role_definition_name = "Azure Kubernetes Service Cluster User Role"
+  principal_id         = module.jump_vm.identity_principal_id
+
+  depends_on = [
+    module.aks,
+    module.jump_vm
+  ]
+}
+
+resource "azurerm_role_assignment" "jump_vm_rg_reader" {
+  scope                = module.resource_group.resource_group_id
+  role_definition_name = "Reader"
+  principal_id         = module.jump_vm.identity_principal_id
+
+  depends_on = [
+    module.resource_group,
+    module.jump_vm
+  ]
 }

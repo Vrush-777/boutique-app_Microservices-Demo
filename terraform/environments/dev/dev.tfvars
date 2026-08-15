@@ -5,13 +5,16 @@ location = "Central India"
 
 vnet_name = "vnet-boutique-dev"
 
-vnet_address_space = "10.0.0.0/16"
+vnet_address_space = "10.1.0.0/16"
 
 aks_subnet_name   = "aks-subnet"
-aks_subnet_prefix = "10.0.1.0/24"
+aks_subnet_prefix = "10.1.1.0/24"
 
 appgw_subnet_name   = "appgw-subnet"
-appgw_subnet_prefix = "10.0.2.0/24"
+appgw_subnet_prefix = "10.1.2.0/24"
+
+jump_subnet_name   = "jump-subnet"
+jump_subnet_prefix = "10.1.3.0/24"
 
 acr_name = "vrushacr777"
 

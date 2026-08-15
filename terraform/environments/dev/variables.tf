@@ -18,6 +18,14 @@ variable "vnet_address_space" {
   type = string
 }
 
+variable "jump_subnet_name" {
+  type = string
+}
+
+variable "jump_subnet_prefix" {
+  type = string
+}
+
 variable "aks_subnet_name" {
   type = string
 }
