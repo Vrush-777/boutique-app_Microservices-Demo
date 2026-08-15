@@ -58,7 +58,7 @@ jobs:
       run: |
         SSH_PUBLIC_KEY=$(cat ~/.ssh/jump-vm.pub)
         terraform plan \
-          -var-file=terraform.tfvars \
+          -var-file=dev.tfvars \
           -var "jump_vm_ssh_public_key=${SSH_PUBLIC_KEY}" \
           -out=tfplan
 
