@@ -10,6 +10,7 @@ RESOURCE_GROUP="rg-devsecops-poc"
 AKS_NAME="aks-boutique-dev"
 ACR_NAME="vrushacr777"
 NAMESPACE="boutique"
+RELEASE_NAME="boutique"
 
 echo "1. Login to Azure using Jump VM Managed Identity"
 
@@ -42,37 +43,60 @@ kubectl get nodes
 
 echo "7. Verify ACR access"
 
-az acr show \
-  --name "${ACR_NAME}" \
-  --query "{name:name, loginServer:loginServer}" \
-  --output table
-
-echo "8. Verify ACR repositories"
-
 az acr repository list \
   --name "${ACR_NAME}" \
   --output table
 
-echo "9. Deploy Boutique using Helm"
+echo "8. Verify Helm"
 
-helm upgrade --install boutique \
-  ./boutique-helm/boutique \
+helm version
+
+echo "9. Check existing Helm release"
+
+if helm status "${RELEASE_NAME}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+
+    echo "Helm release '${RELEASE_NAME}' already exists."
+    echo "Existing deployment will be upgraded."
+
+else
+
+    echo "Helm release '${RELEASE_NAME}' does not exist."
+
+    if kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; then
+        echo "Old namespace '${NAMESPACE}' exists."
+        echo "Deleting namespace created outside Helm..."
+
+        kubectl delete namespace "${NAMESPACE}" --wait=true
+
+        echo "Old namespace deleted."
+    fi
+
+fi
+
+echo "10. Deploy Boutique using Helm"
+
+helm upgrade --install "${RELEASE_NAME}" \
+  ./boutique \
   --namespace "${NAMESPACE}" \
   --create-namespace \
   --wait \
   --timeout 10m
 
-echo "10. Check Helm release"
+echo "11. Check Helm release"
 
 helm list -n "${NAMESPACE}"
 
-echo "11. Check pods"
+echo "12. Check pods"
 
-kubectl get pods -n "${NAMESPACE}"
+kubectl get pods -n "${NAMESPACE}" -o wide
 
-echo "12. Check services"
+echo "13. Check services"
 
 kubectl get svc -n "${NAMESPACE}"
+
+echo "14. Check ingress"
+
+kubectl get ingress -n "${NAMESPACE}" || true
 
 echo "========================================"
 echo "Boutique deployment completed"
