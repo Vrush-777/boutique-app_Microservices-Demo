@@ -2,7 +2,7 @@ namespace: boutique
 
 image:
   registry: vrushacr777.azurecr.io
-  tag: "a19067a61aa0295f1584adbf1fc6e5c45c4077c5"
+  tag: "4b2402e42bcfd44c935a30da296cdd52808b975c"
 
 replicas:
   frontend: 1
@@ -57,4 +57,4 @@ services:
     port: 6379
 
 redis:
-  tag: "a19067a61aa0295f1584adbf1fc6e5c45c4077c5"
+  tag: "4b2402e42bcfd44c935a30da296cdd52808b975c"
