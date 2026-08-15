@@ -6,6 +6,11 @@ echo "========================================"
 echo "Starting Boutique deployment"
 echo "========================================"
 
+if [ -z "${AZURE_SUBSCRIPTION_ID}" ]; then
+  echo "ERROR: AZURE_SUBSCRIPTION_ID is not set"
+  exit 1
+fi
+
 RESOURCE_GROUP="rg-devsecops-poc"
 AKS_NAME="aks-boutique-dev"
 ACR_NAME="vrushacr777"

@@ -75,8 +75,8 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Format
-        run: terraform fmt -recursive
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
 
       - name: Terraform Validate
         run: terraform validate
@@ -445,24 +445,14 @@ jobs:
     needs:
       - terraform
       - update-values
-
     runs-on: ubuntu-latest
 
     steps:
-
-      # --------------------------------------------------------
-      # Checkout latest main
-      # --------------------------------------------------------
-
       - name: Checkout Latest Main
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-
-      # --------------------------------------------------------
-      # Azure Login
-      # --------------------------------------------------------
 
       - name: Azure Login
         uses: azure/login@v2
@@ -471,21 +461,14 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # --------------------------------------------------------
-      # Prepare SSH private key
-      # --------------------------------------------------------
-
       - name: Prepare SSH Key
         shell: bash
         run: |
           set -e
 
           mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
 
-          echo "${{ secrets.JUMP_VM_SSH_PRIVATE_KEY }}" \
-            > ~/.ssh/jump-vm
-
+          echo "${{ secrets.JUMP_VM_SSH_PRIVATE_KEY }}" > ~/.ssh/jump-vm
           chmod 600 ~/.ssh/jump-vm
 
           ssh-keygen -y \
@@ -496,79 +479,70 @@ jobs:
 
           echo "SSH key prepared successfully."
 
-      # --------------------------------------------------------
-      # Add Jump VM to known_hosts
-      # --------------------------------------------------------
-
-      - name: Add Jump VM to Known Hosts
-        shell: bash
-        run: |
-          ssh-keyscan -H \
-            "${{ needs.terraform.outputs.jump_vm_ip }}" \
-            >> ~/.ssh/known_hosts
-
-      # --------------------------------------------------------
-      # Test SSH connection
-      # --------------------------------------------------------
-
       - name: Test SSH Connection
         shell: bash
         run: |
+          set -e
+
           ssh \
             -i ~/.ssh/jump-vm \
-            -o StrictHostKeyChecking=yes \
+            -o StrictHostKeyChecking=no \
             azureuser@${{ needs.terraform.outputs.jump_vm_ip }} \
             "echo 'SSH connection to Jump VM successful'"
 
-      # --------------------------------------------------------
-      # Create deployment directory
-      # --------------------------------------------------------
-
-      - name: Create Deployment Directory
+      - name: Copy Deployment Files to Jump VM
         shell: bash
         run: |
+          set -e
+
+          JUMP_IP="${{ needs.terraform.outputs.jump_vm_ip }}"
+
+          echo "Jump VM IP: $JUMP_IP"
+
+          echo "Creating deployment directory..."
           ssh \
             -i ~/.ssh/jump-vm \
-            azureuser@${{ needs.terraform.outputs.jump_vm_ip }} \
+            -o StrictHostKeyChecking=no \
+            azureuser@"$JUMP_IP" \
             "mkdir -p /opt/deploy/boutique"
 
-      # --------------------------------------------------------
-      # Copy Helm chart
-      # --------------------------------------------------------
-
-      - name: Copy Helm Chart to Jump VM
-        shell: bash
-        run: |
+          echo "Copying Helm chart..."
           scp \
             -i ~/.ssh/jump-vm \
+            -o StrictHostKeyChecking=no \
             -r boutique-helm \
-            azureuser@${{ needs.terraform.outputs.jump_vm_ip }}:/opt/deploy/boutique/
+            azureuser@"$JUMP_IP":/opt/deploy/boutique/
 
-      # --------------------------------------------------------
-      # Copy deployment script
-      # --------------------------------------------------------
-
-      - name: Copy Deployment Script
-        shell: bash
-        run: |
+          echo "Copying deployment script..."
           scp \
             -i ~/.ssh/jump-vm \
+            -o StrictHostKeyChecking=no \
             scripts/deploy-from-jump.sh \
-            azureuser@${{ needs.terraform.outputs.jump_vm_ip }}:/opt/deploy/
+            azureuser@"$JUMP_IP":/opt/deploy/
 
-      # --------------------------------------------------------
-      # Deploy application
-      # --------------------------------------------------------
+          echo "Deployment files copied successfully."
 
       - name: Deploy Boutique from Jump VM
         shell: bash
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
+          set -e
+
+          JUMP_IP="${{ needs.terraform.outputs.jump_vm_ip }}"
+
+          echo "Starting deployment on Jump VM: $JUMP_IP"
+
           ssh \
             -i ~/.ssh/jump-vm \
-            azureuser@${{ needs.terraform.outputs.jump_vm_ip }} \
-            "chmod +x /opt/deploy/deploy-from-jump.sh && \
-             cd /opt/deploy/boutique && \
-             AZURE_SUBSCRIPTION_ID='${AZURE_SUBSCRIPTION_ID}' \
-             bash /opt/deploy/deploy-from-jump.sh
+            -o StrictHostKeyChecking=no \
+            azureuser@"$JUMP_IP" \
+            "chmod +x /opt/deploy/deploy-from-jump.sh"
+
+          ssh \
+            -i ~/.ssh/jump-vm \
+            -o StrictHostKeyChecking=no \
+            azureuser@"$JUMP_IP" \
+            "cd /opt/deploy/boutique && AZURE_SUBSCRIPTION_ID='$AZURE_SUBSCRIPTION_ID' bash /opt/deploy/deploy-from-jump.sh"
+
+          echo "Boutique deployment completed successfully."
