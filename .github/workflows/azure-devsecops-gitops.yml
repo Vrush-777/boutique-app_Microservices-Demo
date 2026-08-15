@@ -18,9 +18,6 @@ jobs:
     name: Terraform Infrastructure
     runs-on: ubuntu-latest
 
-    outputs:
-    jump_vm_ip: ${{ steps.jump-ip.outputs.jump_ip }}
-
     defaults:
       run:
         working-directory: terraform/environments/dev
@@ -344,12 +341,12 @@ jobs:
         shell: bash
         run: |
           ssh -i ~/.ssh/jump-vm \
-            azureuser@${{ steps.jump.outputs.jump_ip }} \
+            azureuser@${{ needs.terraform.outputs.jump_vm_ip }} \
             "mkdir -p /opt/deploy/boutique"
 
           scp -i ~/.ssh/jump-vm \
-            -r boutique-helm \
-            azureuser@${{ steps.jump.outputs.jump_ip }}:/opt/deploy/boutique/
+          -r boutique-helm \
+          azureuser@${{ needs.terraform.outputs.jump_vm_ip }}:/opt/deploy/boutique/
 
       - name: Deploy Boutique from Jump VM
         shell: bash
@@ -357,7 +354,7 @@ jobs:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           ssh -i ~/.ssh/jump-vm \
-            azureuser@${{ steps.jump.outputs.jump_ip }} \
+            azureuser@${{ needs.terraform.outputs.jump_vm_ip }} \
             "cd /opt/deploy/boutique && \
             AZURE_SUBSCRIPTION_ID='${AZURE_SUBSCRIPTION_ID}' \
             bash -s" < scripts/deploy-boutique.sh
