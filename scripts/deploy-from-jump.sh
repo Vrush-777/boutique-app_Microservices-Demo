@@ -53,13 +53,7 @@ az acr repository list \
   --name "${ACR_NAME}" \
   --output table
 
-echo "9. Create Boutique namespace"
-
-kubectl create namespace "${NAMESPACE}" \
-  --dry-run=client \
-  -o yaml | kubectl apply -f -
-
-echo "10. Deploy Boutique using Helm"
+echo "9. Deploy Boutique using Helm"
 
 helm upgrade --install boutique \
   ./boutique-helm/boutique \
@@ -68,15 +62,15 @@ helm upgrade --install boutique \
   --wait \
   --timeout 10m
 
-echo "11. Check Helm release"
+echo "10. Check Helm release"
 
 helm list -n "${NAMESPACE}"
 
-echo "12. Check pods"
+echo "11. Check pods"
 
 kubectl get pods -n "${NAMESPACE}"
 
-echo "13. Check services"
+echo "12. Check services"
 
 kubectl get svc -n "${NAMESPACE}"
 
