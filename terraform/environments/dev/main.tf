@@ -119,7 +119,8 @@ module "jump_vm" {
   subnet_id = module.network.jump_subnet_id
 
   admin_username = "azureuser"
-  public_key     = file(pathexpand("~/.ssh/id_rsa.pub"))
+
+  public_key = var.jump_vm_ssh_public_key
 
   acr_id = module.acr.id
 
