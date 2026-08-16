@@ -375,67 +375,6 @@ jobs:
         run: |
           echo "Redis image pushed successfully."
 
-
-  # ============================================================
-  # 5. UPDATE HELM IMAGE TAG
-  # ============================================================
-
-  update-values:
-    name: Update Helm Image Tag
-    needs:
-      - build
-      - redis-image
-
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-
-    steps:
-
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-
-      - name: Update Helm Image Tag
-        run: |
-          sed -i -E \
-            "s|^  tag:.*|  tag: \"${GITHUB_SHA}\"|" \
-            boutique-helm/boutique/values.yaml
-
-      - name: Verify Helm Image Tag
-        run: |
-          echo "Updated image tags:"
-          grep -E "^[[:space:]]+tag:" \
-            boutique-helm/boutique/values.yaml
-
-      - name: Verify values.yaml
-        run: |
-          echo "===== Updated values.yaml ====="
-          cat boutique-helm/boutique/values.yaml
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email \
-            "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Commit Changes
-        run: |
-          git add boutique-helm/boutique/values.yaml
-
-          git diff --cached --quiet || \
-            git commit \
-              -m "Update image tag to ${GITHUB_SHA}"
-
-      - name: Push Changes
-        run: |
-          git push origin main
-
-
   # ============================================================
   # 6. DEPLOY TO PRIVATE AKS FROM JUMP VM
   # ============================================================
@@ -444,7 +383,8 @@ jobs:
     name: Deploy Boutique from Jump VM
     needs:
       - terraform
-      - update-values
+      - build
+      - redis-image
     runs-on: ubuntu-latest
 
     steps:
@@ -490,35 +430,44 @@ jobs:
             azureuser@${{ needs.terraform.outputs.jump_vm_ip }} \
             "echo 'SSH connection to Jump VM successful'"
 
-      - name: Copy Deployment Files to Jump VM
+      - name: Copy Helm chart to Jump VM
         shell: bash
         run: |
           set -e
 
           JUMP_IP="${{ needs.terraform.outputs.jump_vm_ip }}"
 
-          echo "Jump VM IP: $JUMP_IP"
+          echo "Preparing Helm chart directory on Jump VM..."
 
-          echo "Creating deployment directory..."
           ssh \
             -i ~/.ssh/jump-vm \
             -o StrictHostKeyChecking=no \
             azureuser@"$JUMP_IP" \
-            "mkdir -p /opt/deploy/boutique"
+            "rm -rf /opt/deploy/boutique && mkdir -p /opt/deploy/boutique"
 
           echo "Copying Helm chart..."
+
           scp \
             -i ~/.ssh/jump-vm \
             -o StrictHostKeyChecking=no \
-            -r boutique-helm \
+            -r boutique-helm/boutique/. \
             azureuser@"$JUMP_IP":/opt/deploy/boutique/
 
           echo "Copying deployment script..."
+
           scp \
             -i ~/.ssh/jump-vm \
             -o StrictHostKeyChecking=no \
             scripts/deploy-from-jump.sh \
-            azureuser@"$JUMP_IP":/opt/deploy/
+            azureuser@"$JUMP_IP":/opt/deploy/deploy-from-jump.sh
+
+          echo "Verifying files on Jump VM..."
+
+          ssh \
+            -i ~/.ssh/jump-vm \
+            -o StrictHostKeyChecking=no \
+            azureuser@"$JUMP_IP" \
+            "ls -la /opt/deploy/boutique && test -f /opt/deploy/boutique/Chart.yaml"
 
           echo "Deployment files copied successfully."
 
@@ -526,12 +475,14 @@ jobs:
         shell: bash
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           set -e
 
           JUMP_IP="${{ needs.terraform.outputs.jump_vm_ip }}"
 
           echo "Starting deployment on Jump VM: $JUMP_IP"
+          echo "Deploying image tag: $IMAGE_TAG"
 
           ssh \
             -i ~/.ssh/jump-vm \
@@ -543,4 +494,6 @@ jobs:
             -i ~/.ssh/jump-vm \
             -o StrictHostKeyChecking=no \
             azureuser@"$JUMP_IP" \
-            "cd /opt/deploy/boutique && AZURE_SUBSCRIPTION_ID='${AZURE_SUBSCRIPTION_ID}' bash /opt/deploy/deploy-from-jump.sh"
+            "AZURE_SUBSCRIPTION_ID='${AZURE_SUBSCRIPTION_ID}' \
+            IMAGE_TAG='${IMAGE_TAG}' \
+            bash /opt/deploy/deploy-from-jump.sh"

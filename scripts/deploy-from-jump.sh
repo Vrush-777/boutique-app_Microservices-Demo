@@ -11,6 +11,19 @@ AKS_NAME="aks-boutique-dev"
 ACR_NAME="vrushacr777"
 NAMESPACE="boutique"
 RELEASE_NAME="boutique"
+CHART_PATH="/opt/deploy/boutique"
+
+# IMAGE_TAG is passed from GitHub Actions.
+# Example:
+# IMAGE_TAG=a19067...
+IMAGE_TAG="${IMAGE_TAG:-}"
+
+if [ -z "${IMAGE_TAG}" ]; then
+    echo "ERROR: IMAGE_TAG is not set."
+    exit 1
+fi
+
+echo "Using image tag: ${IMAGE_TAG}"
 
 echo "1. Login to Azure using Jump VM Managed Identity"
 
@@ -51,52 +64,57 @@ echo "8. Verify Helm"
 
 helm version
 
-echo "9. Check existing Helm release"
+echo "9. Verify Helm chart"
 
-if helm status "${RELEASE_NAME}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+test -f "${CHART_PATH}/Chart.yaml"
 
-    echo "Helm release '${RELEASE_NAME}' already exists."
-    echo "Existing deployment will be upgraded."
+echo "Helm chart found:"
+ls -la "${CHART_PATH}"
 
+echo "10. Verify namespace"
+
+if kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; then
+    echo "Namespace '${NAMESPACE}' already exists."
 else
-
-    echo "Helm release '${RELEASE_NAME}' does not exist."
-
-    if kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; then
-        echo "Old namespace '${NAMESPACE}' exists."
-        echo "Deleting namespace created outside Helm..."
-
-        kubectl delete namespace "${NAMESPACE}" --wait=true
-
-        echo "Old namespace deleted."
-    fi
-
+    echo "Creating namespace '${NAMESPACE}'."
+    kubectl create namespace "${NAMESPACE}"
 fi
 
-echo "10. Deploy Boutique using Helm"
+echo "11. Deploy Boutique using Helm"
 
-helm upgrade --install "${RELEASE_NAME}" \
-  ./boutique \
+cd "${CHART_PATH}"
+
+helm upgrade --install "${RELEASE_NAME}" . \
   --namespace "${NAMESPACE}" \
-  --create-namespace \
+  --set image.tag="${IMAGE_TAG}" \
+  --set redis.tag="${IMAGE_TAG}" \
   --wait \
   --timeout 10m
 
-echo "11. Check Helm release"
+echo "12. Check Helm release"
 
 helm list -n "${NAMESPACE}"
 
-echo "12. Check pods"
+echo "13. Check pods"
 
-kubectl get pods -n "${NAMESPACE}" -o wide
+kubectl get pods \
+  -n "${NAMESPACE}" \
+  -o wide
 
-echo "13. Check services"
+echo "14. Check services"
 
-kubectl get svc -n "${NAMESPACE}"
+kubectl get svc \
+  -n "${NAMESPACE}"
 
-echo "14. Check ingress"
+echo "15. Check HPA"
 
-kubectl get ingress -n "${NAMESPACE}" || true
+kubectl get hpa \
+  -n "${NAMESPACE}" || true
+
+echo "16. Check ingress"
+
+kubectl get ingress \
+  -n "${NAMESPACE}" || true
 
 echo "========================================"
 echo "Boutique deployment completed"
